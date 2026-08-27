@@ -3490,13 +3490,13 @@ that a `TEAM`-scoped grant doesn't yet filter anything — that's Phase 2's job.
 
 Implement:
 
-* employee profiles;
-* departments;
-* teams;
-* Team Leaders;
-* Operation Managers;
-* team membership;
-* hierarchy.
+* ☑ employee profiles;
+* ☑ departments;
+* ☑ teams;
+* ☑ Team Leaders;
+* ☑ Operation Managers;
+* ☑ team membership;
+* ☑ hierarchy.
 
 Completion condition:
 
@@ -3504,6 +3504,34 @@ Completion condition:
 Laravel can determine
 who manages each employee.
 ```
+
+**Phase 2 status: complete, 2026-08-27.** `employees`/`departments`/`teams`/`team_members`/
+`employee_status_history` tables. department/team/team-leader/operation-manager are
+deliberately *not* columns on `employees` — they're derived by walking
+`team_members → teams → departments` (`Employee::currentTeam()`/`teamLeader()`/
+`operationManager()`), so a transfer can never leave two contradictory sources of truth;
+`team_members` keeps `started_at`/`ended_at` instead of being deleted on transfer, so
+history survives (§14). `ScopeResolver` (stubbed in Phase 1) now actually resolves
+TEAM/DEPARTMENT/OPERATION into real employee-ID sets; HR_SCOPE simplifies to unrestricted
+for V1 since no HR-territory table exists. `EmployeeService::invite()` creates the paired
+User account and emails an invitation; accepting it turned out to be the same action as
+resetting a forgotten password (setting one), so `NewPasswordController` just checks
+whether the account was still INVITED and transitions it — no separate accept-invitation
+endpoint exists despite §139.6 originally listing one (removed there and from `api.md`).
+Full CRUD + transfer + membership endpoints and policies; out-of-scope and no-permission
+both return 404 on a specific employee, never 403, matching §139.2. Frontend: searchable
+employee table, invite form, detail page with transfer/status controls, department/team
+management with member add/remove — all Playwright-verified against the real backend, not
+mocks. 134 backend tests pass on MySQL, phpstan/pint clean; frontend builds/lints clean.
+Both repos pushed; backend CI green.
+
+Two real bugs were caught by testing against the live app rather than trusting types:
+a freshly created department/team showed `active: null` in the API response instead of
+the database's actual default (`true`) — Eloquent doesn't hydrate a mass-assigned model's
+absent attributes after `create()`, fixed by mirroring the column default on the model
+(`protected $attributes`). And Mantine's `DateInput` returns a `"YYYY-MM-DD"` string, not
+a `Date` — the joining-date field was validated against `z.date()` and silently rejected
+every value despite displaying it correctly.
 
 **Dependency:** Phase 1.
 
@@ -4735,7 +4763,7 @@ Enums        SCREAMING_SNAKE_CASE, matching the PHP enum exactly
 ```text
 auth          POST   /auth/login  /auth/logout  /auth/two-factor-challenge
               POST   /auth/forgot-password  /auth/reset-password
-              POST   /auth/accept-invitation
+              (accepting an invitation reuses reset-password — see Phase 2 note below)
               GET    /auth/me                    user + roles + permissions + scopes
               PUT    /auth/password
               GET    /auth/sessions              active tokens
