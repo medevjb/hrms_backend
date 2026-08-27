@@ -17,16 +17,17 @@ enum Scope: string
     case System = 'SYSTEM';
 
     /**
-     * Scopes above that are grants over other employees, not just the
-     * grantee's own record. Team/Department/Operation/HrScope need a
-     * scope_id (a team, department, or similar) once Phase 2 exists;
-     * Self/AllEmployees/System never do.
+     * Team/Department/Operation point at a specific team/department id.
+     * HrScope needs none: V1 has no HR-territory table to subdivide the
+     * workforce by, so ScopeResolver treats it as unrestricted, same as
+     * AllEmployees — see app/Services/ScopeResolver.php. Self/AllEmployees/
+     * System never need one either.
      */
     public function needsScopeId(): bool
     {
         return match ($this) {
-            self::Team, self::Department, self::Operation, self::HrScope => true,
-            self::Self, self::AllEmployees, self::System => false,
+            self::Team, self::Department, self::Operation => true,
+            self::Self, self::HrScope, self::AllEmployees, self::System => false,
         };
     }
 }

@@ -99,6 +99,18 @@ return [
             'expire' => 60,
             'throttle' => 60,
         ],
+
+        // Same table as 'users' — an invitation and a forgot-password
+        // request for the same not-yet-onboarded email within the same
+        // window would overwrite each other's token, an accepted V1
+        // tradeoff (docs/PRD.md §148 #2 wants a 72h invite window;
+        // ordinary password resets deliberately stay short-lived).
+        'employee_invitations' => [
+            'provider' => 'users',
+            'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
+            'expire' => 4320,
+            'throttle' => 60,
+        ],
     ],
 
     /*
