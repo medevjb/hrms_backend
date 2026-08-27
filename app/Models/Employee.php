@@ -126,4 +126,25 @@ class Employee extends Model
     {
         return $this->hasMany(EmployeeStatusHistory::class);
     }
+
+    /**
+     * @return HasMany<EmployeeShift, $this>
+     */
+    public function shiftAssignments(): HasMany
+    {
+        return $this->hasMany(EmployeeShift::class);
+    }
+
+    /**
+     * @return HasOne<EmployeeShift, $this>
+     */
+    public function currentShiftAssignment(): HasOne
+    {
+        return $this->hasOne(EmployeeShift::class)->whereNull('ended_at');
+    }
+
+    public function currentShift(): ?Shift
+    {
+        return $this->currentShiftAssignment?->shift;
+    }
 }

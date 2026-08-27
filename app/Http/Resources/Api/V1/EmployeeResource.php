@@ -41,6 +41,10 @@ class EmployeeResource extends JsonResource
                 'name' => $team->department->name,
             ] : null,
             'team' => $team ? ['id' => $team->id, 'name' => $team->name] : null,
+            'current_shift' => $this->currentShiftAssignment?->shift ? [
+                'id' => $this->currentShiftAssignment->shift->id,
+                'name' => $this->currentShiftAssignment->shift->name,
+            ] : null,
             'team_leader' => $team?->teamLeader ? [
                 'id' => $team->teamLeader->id,
                 'full_name' => $team->teamLeader->fullName(),

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\EmployeeStatus;
 use App\Models\Employee;
+use App\Models\Shift;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\Password;
@@ -90,6 +91,23 @@ class EmployeeService
     {
         $employee->currentTeamMembership?->update([
             'ended_at' => $effectiveDate ?? now()->toDateString(),
+        ]);
+    }
+
+    /**
+     * Ends the employee's current shift assignment (if any) and starts a
+     * new one — mirrors transfer(); never deletes the old row, so a shift
+     * change stays auditable history (docs/PRD.md §14, §104).
+     */
+    public function assignShift(Employee $employee, Shift $shift, ?string $effectiveDate = null): void
+    {
+        $effectiveDate ??= now()->toDateString();
+
+        $employee->currentShiftAssignment?->update(['ended_at' => $effectiveDate]);
+
+        $employee->shiftAssignments()->create([
+            'shift_id' => $shift->id,
+            'started_at' => $effectiveDate,
         ]);
     }
 

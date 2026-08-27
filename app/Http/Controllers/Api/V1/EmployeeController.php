@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\EmployeeStatus;
 use App\Enums\PermissionName;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\Employees\AssignShiftRequest;
 use App\Http\Requests\Api\V1\Employees\CreateEmployeeRequest;
 use App\Http\Requests\Api\V1\Employees\TransferEmployeeRequest;
 use App\Http\Requests\Api\V1\Employees\UpdateEmployeeRequest;
 use App\Http\Requests\Api\V1\Employees\UpdateEmployeeStatusRequest;
 use App\Http\Resources\Api\V1\EmployeeResource;
 use App\Models\Employee;
+use App\Models\Shift;
 use App\Models\Team;
 use App\Services\EmployeeService;
 use App\Services\ScopeResolver;
@@ -25,6 +27,7 @@ class EmployeeController extends Controller
         'user',
         'currentTeamMembership.team.department.operationManager',
         'currentTeamMembership.team.teamLeader',
+        'currentShiftAssignment.shift',
     ];
 
     public function __construct(private readonly ScopeResolver $scopeResolver) {}
@@ -123,6 +126,19 @@ class EmployeeController extends Controller
 
         $team = Team::query()->whereKey($request->validated('team_id'))->firstOrFail();
         $employees->transfer($employee, $team, $request->validated('effective_date'));
+
+        return ApiResponse::data(new EmployeeResource($employee->fresh(self::EAGER_LOAD)));
+    }
+
+    public function assignShift(
+        AssignShiftRequest $request,
+        Employee $employee,
+        EmployeeService $employees,
+    ): JsonResponse {
+        abort_unless(Gate::allows('update', $employee), 404);
+
+        $shift = Shift::query()->whereKey($request->validated('shift_id'))->firstOrFail();
+        $employees->assignShift($employee, $shift, $request->validated('effective_date'));
 
         return ApiResponse::data(new EmployeeResource($employee->fresh(self::EAGER_LOAD)));
     }
