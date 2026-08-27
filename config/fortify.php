@@ -73,7 +73,7 @@ return [
     |
     */
 
-    'home' => '/dashboard',
+    'home' => '/system',
 
     /*
     |--------------------------------------------------------------------------
@@ -144,7 +144,9 @@ return [
     */
 
     'features' => [
-        Features::registration(),
+        // Features::registration() is intentionally omitted — self-registration is
+        // closed on an HRM holding salary data. Employees enter via the INVITED
+        // flow (docs/PRD.md §13, §92.4, §148 open decision #2), not this route.
         Features::resetPasswords(),
         Features::emailVerification(),
         Features::twoFactorAuthentication([

@@ -1,7 +1,7 @@
 <?php
 
-test('returns a successful response', function () {
+test('the root path redirects to the system console', function () {
     $response = $this->get(route('home'));
 
-    $response->assertOk();
+    $response->assertRedirect('/system');
 });

@@ -2,15 +2,19 @@
 
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',
+        apiPrefix: 'api/v1',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
@@ -27,4 +31,28 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        // docs/PRD.md §139.2 — every API error shares one envelope: message, errors, code.
+        $exceptions->render(function (ValidationException $e, Request $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
+            return response()->json([
+                'message' => $e->getMessage(),
+                'errors' => $e->errors(),
+                'code' => 'VALIDATION_FAILED',
+            ], $e->status);
+        });
+
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
+            return response()->json([
+                'message' => $e->getMessage(),
+                'code' => 'UNAUTHENTICATED',
+            ], 401);
+        });
     })->create();
