@@ -16,7 +16,7 @@ function startTwoFactorChallenge(User $user): string
         'email' => $user->email,
         'password' => 'password',
         'device_name' => 'phpunit',
-    ])->json('challenge_id');
+    ])->json('data.challenge_id');
 }
 
 test('a valid totp code completes the challenge and issues a token', function () {

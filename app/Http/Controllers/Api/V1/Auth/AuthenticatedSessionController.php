@@ -58,10 +58,10 @@ class AuthenticatedSessionController extends Controller
 
             cache()->put("api-2fa-challenge:{$challengeId}", $user->id, now()->addMinutes(5));
 
-            return response()->json([
+            return ApiResponse::data([
                 'two_factor' => true,
                 'challenge_id' => $challengeId,
-            ], 202);
+            ], status: 202);
         }
 
         return $this->issueTokenResponse($user, $request);

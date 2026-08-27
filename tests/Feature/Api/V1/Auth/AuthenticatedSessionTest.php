@@ -56,8 +56,8 @@ test('users with two factor enabled receive a challenge instead of a token', fun
     ]);
 
     $response->assertStatus(202);
-    $response->assertJson(['two_factor' => true]);
-    $response->assertJsonStructure(['challenge_id']);
+    $response->assertJson(['data' => ['two_factor' => true]]);
+    $response->assertJsonStructure(['data' => ['challenge_id']]);
 });
 
 test('protected routes reject requests without a token using the shared error envelope', function () {
