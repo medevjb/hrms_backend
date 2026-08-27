@@ -55,4 +55,35 @@ return Application::configure(basePath: dirname(__DIR__))
                 'code' => 'UNAUTHENTICATED',
             ], 401);
         });
+
+        // Catch-all: any api/* JSON error that didn't go through a render() callback
+        // above (403 from a policy, 404 from route-model binding, 429 from throttling,
+        // an uncaught 500, ...) still gets a `code` per docs/PRD.md §139.2.
+        $exceptions->respond(function ($response, Throwable $e, Request $request) {
+            if (! $request->is('api/*') || ! $response->headers->get('Content-Type')) {
+                return $response;
+            }
+
+            if (! str_contains((string) $response->headers->get('Content-Type'), 'application/json')) {
+                return $response;
+            }
+
+            $payload = json_decode($response->getContent() ?: '{}', true) ?? [];
+
+            if (array_key_exists('code', $payload)) {
+                return $response;
+            }
+
+            $payload['code'] = match ($response->getStatusCode()) {
+                403 => 'UNAUTHORIZED',
+                404 => 'NOT_FOUND',
+                409 => 'CONFLICT',
+                429 => 'THROTTLED',
+                default => $response->getStatusCode() >= 500 ? 'SERVER_ERROR' : 'ERROR',
+            };
+
+            $response->setData($payload);
+
+            return $response;
+        });
     })->create();
