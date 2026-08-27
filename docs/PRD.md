@@ -3543,17 +3543,17 @@ This phase now includes the configurable late grace feature.
 
 Implement:
 
-* organization timezone;
-* organization currency;
-* weekend configuration;
-* default shift;
-* shifts;
-* temporary shift changes;
-* global late grace period;
-* optional shift-specific grace override;
-* overtime global settings;
-* payroll cutoff setting;
-* holiday calendar foundation.
+* ☑ organization timezone;
+* ☑ organization currency;
+* ☑ weekend configuration;
+* ☑ default shift;
+* ☑ shifts;
+* ☑ temporary shift changes;
+* ☑ global late grace period;
+* ☑ optional shift-specific grace override;
+* ☑ overtime global settings;
+* ☑ payroll cutoff setting;
+* ☑ holiday calendar foundation.
 
 Default:
 
@@ -3587,6 +3587,46 @@ Grace End Time?
 Holiday?
 Weekend?
 ```
+
+**Phase 3 status: complete, 2026-08-27.** Backend: `shifts`/`organization_settings`
+(singleton, read through `OrganizationSettings::current()`)/`employee_shifts`/
+`shift_overrides`/`holidays` tables. `ShiftService::resolveForDate()` is the completion
+condition made literal — one method returning a `ShiftResolution` value object with
+exactly the eight facts §104 asks for, given an employee and a date; a `shift_override` row
+for that exact date always wins over the regular `employee_shifts` assignment without
+touching it (§23), and an overnight shift's end time lands on the following calendar day
+(§136). `employee_shifts`/`team_members` share the same started_at/ended_at-never-deleted
+shape, so `EmployeeService::assignShift()` mirrors `transfer()` exactly. Settings are one
+table split across four separately-permissioned endpoints (`/settings/organization`,
+`/settings/attendance`, `/settings/overtime`, `/settings/payroll` — §139.6), each gated by
+its own permission (`settings.manage`, `attendance.settings.manage`,
+`overtime.policy.manage`, `payroll.settings.manage`) rather than one blanket check, since
+those are genuinely different privileges (Head of HR holds all four; nobody else holds
+any). `leave_year_start_month`/`leave_carry_forward_cap_days` already exist as columns on
+the same table but aren't exposed by any endpoint yet — out of scope until Phase 5's
+leave-policies work actually needs them. 173 backend tests pass on MySQL,
+`vendor/bin/phpstan`/`pint` clean. Frontend: Settings page (tabbed Organization/
+Attendance/Overtime/Payroll forms), Shifts catalogue (create/edit), Holiday calendar
+(create/edit/delete), and — on the employee detail page — both "assign regular shift" and
+"temporary shift change" actions, the latter mirroring the Transfer card. Build/lint/
+type-check clean; every new endpoint was smoke-tested end to end through the real Next.js
+proxy with a real session cookie against the live backend (login → create/read/update
+across all five resources), not just unit-tested — but unlike Phase 1/2, this pass had no
+Playwright/browser access, so the UI itself was not click-tested in a real browser this
+time. That's worth doing before calling the frontend done, not just the wiring.
+
+A real bug surfaced during that smoke test, not the test suite: `OrganizationSettings::
+current()` originally cached the full Eloquent model object via `Cache::rememberForever`.
+Against the `database` cache driver, a `rememberForever` entry never expires — so the very
+next code change to the model's shape (this phase added one) leaves a previous deploy's
+serialized object sitting in the `cache` table, unserializing as `__PHP_Incomplete_Class`
+and 500ing every request that touches settings (i.e. almost everything) until someone
+manually clears it. Fixed by caching `getAttributes()` — a plain array — and rehydrating
+through `newFromBuilder()`, which has no class shape to go stale. Regression-tested by
+seeding the cache with a raw attributes array directly and asserting `current()` still
+resolves; the original failure mode (a genuinely incompatible serialized object) isn't
+practical to reproduce in a test, but the fix removes the mechanism, not just this
+instance of it.
 
 **Dependency:** Phase 2.
 
