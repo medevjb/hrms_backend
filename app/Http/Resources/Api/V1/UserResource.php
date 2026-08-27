@@ -19,6 +19,10 @@ class UserResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'two_factor_enabled' => $this->hasEnabledTwoFactorAuthentication(),
+            // Display-only, per docs/PRD.md §92.2 — the frontend hides/shows
+            // controls with these, but every real check happens server-side.
+            'roles' => $this->roles()->pluck('name')->values(),
+            'permissions' => $this->permissionNames(),
         ];
     }
 }
