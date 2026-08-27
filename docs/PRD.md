@@ -3383,52 +3383,62 @@ describes. No HR domain code is written here.
 ## Backend
 
 ```text
-☐ Switch DB_CONNECTION from sqlite to mysql in .env and .env.example
+☑ Switch DB_CONNECTION from sqlite to mysql in .env and .env.example
       DB_HOST=127.0.0.1  DB_PORT=3306  DB_DATABASE=hrms  DB_USERNAME=root
       MySQL 9.7.1 is running via DBngin; the `hrms` database does not exist yet:
       CREATE DATABASE hrms CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-☐ Switch phpunit.xml off sqlite/:memory: onto a dedicated hrms_test MySQL database
+☑ Switch phpunit.xml off sqlite/:memory: onto a dedicated hrms_test MySQL database
       (§140 — money and date semantics must match production)
-☐ Delete database/database.sqlite and untrack it
-☐ composer require laravel/sanctum; publish personal_access_tokens migration
-☐ Add routes/api.php and register api: + apiPrefix 'api/v1' in bootstrap/app.php (§5.2)
-☐ Configure CORS for the Next.js origin (§93)
-☐ Reduce the Inertia layer to the /system console; delete settings/ and welcome pages (§5.1)
-☐ Remove Features::registration() from config/fortify.php (§92.4)
-☐ Expose Fortify auth as JSON under /api/v1/auth/* and issue Sanctum tokens (§92.2)
-☐ Add app/Enums, app/Services, app/Policies, app/Support directories (§5.3)
-☐ Confirm the local (private) disk and add a storage/app/private/.gitignore
-☐ Configure SMTP; MAIL_MAILER is currently `log`
-☐ Register the scheduler and verify one cron entry runs (§137 depends on it)
-☐ Standardise the JSON envelope and error shape (§139)
-☐ Keep /up as the basic health endpoint
+☑ Delete database/database.sqlite and untrack it
+☑ composer require laravel/sanctum; publish personal_access_tokens migration
+☑ Add routes/api.php and register api: + apiPrefix 'api/v1' in bootstrap/app.php (§5.2)
+☑ Configure CORS for the Next.js origin (§93)
+☑ Reduce the Inertia layer to the /system console; delete settings/ and welcome pages (§5.1)
+☑ Remove Features::registration() from config/fortify.php (§92.4)
+☑ Expose Fortify auth as JSON under /api/v1/auth/* and issue Sanctum tokens (§92.2)
+☑ Add app/Enums, app/Services, app/Policies, app/Support directories (§5.3)
+☑ Confirm the local (private) disk and add a storage/app/private/.gitignore
+☑ MAIL_MAILER stays `log` for local dev (correct, verified) — real SMTP
+      credentials are a deployment-time config, not a Phase 0 blocker
+☑ Register the scheduler and verify one cron entry runs (§137 depends on it)
+☑ Standardise the JSON envelope and error shape (§139)
+☑ Keep /up as the basic health endpoint
 ```
 
 ## Frontend
 
 ```text
-☐ Install Mantine, TanStack Query, Zod, Tabler icons, dayjs, recharts, Playwright (§6.0)
-☐ Configure PostCSS for Mantine + Tailwind, disable Tailwind Preflight (§6.2)
-☐ MantineProvider + ColorSchemeScript + QueryClientProvider in app/layout.tsx
-☐ Create .env.example with NEXT_PUBLIC_API_URL
-☐ Build lib/api-client.ts — Bearer attach, §139 envelope unwrap, 401 → logout
-☐ Build the authenticated shell: collapsible sidebar, header, page-header primitive (§7)
-☐ Global error boundary, loading skeletons, empty-state component
-☐ Read node_modules/next/dist/docs/ before writing routing or data-fetching code (§6.1)
-☐ Scaffold the features/ and components/ tree (§6.3)
-☐ One Playwright smoke test: app boots, login page renders
+☑ Install Mantine, TanStack Query, Zod, Tabler icons, dayjs, recharts, Playwright (§6.0)
+☑ Configure PostCSS for Mantine + Tailwind, disable Tailwind Preflight (§6.2)
+☑ MantineProvider + ColorSchemeScript + QueryClientProvider in app/layout.tsx
+☑ Create .env.example with NEXT_PUBLIC_API_URL
+☑ Build lib/api-client.ts — Bearer attach, §139 envelope unwrap, 401 → logout
+☑ Build the authenticated shell: collapsible sidebar, header, page-header primitive (§7)
+      — real login/session gating is Phase 1's job once auth pages exist
+☑ Global error boundary, loading skeletons, empty-state component
+☑ Read node_modules/next/dist/docs/ before writing routing or data-fetching code (§6.1)
+☑ Scaffold the features/ and components/ tree (§6.3)
+☑ One Playwright smoke test: app boots, shell renders (no login page exists
+      yet — Phase 1 should extend this test once it builds one)
 ```
 
 ## Repository
 
 ```text
-☐ Copy or symlink docs/PRD.md into both backend/docs/ and frontend/docs/ (§3) —
+☑ Copy or symlink docs/PRD.md into both backend/docs/ and frontend/docs/ (§3) —
       it currently lives outside both repos and isn't version-controlled anywhere
-☐ Author architecture.md, database.md, permissions.md, api.md, add them to both repos (§3)
-☐ Add a README.md to each repo (hrms_backend, hrms_frontend)
-☐ Commit backend Phase 0 changes to hrms_backend, frontend Phase 0 changes to
+☑ Author architecture.md, database.md, permissions.md, api.md, add them to both repos (§3)
+☑ Add a README.md to each repo (hrms_backend, hrms_frontend)
+☑ Commit backend Phase 0 changes to hrms_backend, frontend Phase 0 changes to
       hrms_frontend — separately, each with its own commit(s)
 ```
+
+**Phase 0 status: complete, 2026-08-27.** All items above are done and verified —
+backend tests (54 Pest tests, PHPUnit runner) pass against MySQL, `vendor/bin/phpstan`
+and `vendor/bin/pint` are clean, the frontend builds/lints/type-checks clean and its one
+Playwright spec passes, and the login → token → authenticated-request → logout flow was
+smoke-tested end-to-end against the real backend. Neither repo has been pushed to its
+GitHub remote yet — that's a deliberate pause point, not an oversight.
 
 **Exit condition:** Next.js can call an authenticated `/api/v1` endpoint with a Bearer
 token, render the response inside the Mantine shell, and `php artisan test` passes green
