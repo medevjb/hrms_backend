@@ -18,7 +18,11 @@ return [
     |
     */
 
-    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
+    // Unused by this app — docs/PRD.md §92.1 is Bearer tokens only, so
+    // EnsureFrontendRequestsAreStateful is never added to the web middleware
+    // group. Left in place (with the type fixed) rather than deleted, in case
+    // a later phase wants Sanctum's cookie mode for another client.
+    'stateful' => explode(',', (string) env('SANCTUM_STATEFUL_DOMAINS', sprintf(
         '%s%s',
         'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
         Sanctum::currentApplicationUrlWithPort(),
