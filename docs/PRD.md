@@ -3452,14 +3452,35 @@ against MySQL.
 
 Implement:
 
-* users;
-* login/logout;
-* password reset;
-* roles;
-* permissions;
-* scopes;
-* Laravel Policies;
-* protected Next.js routes.
+* ☑ users;
+* ☑ login/logout;
+* ☑ password reset;
+* ☑ roles;
+* ☑ permissions;
+* ☑ scopes;
+* ☑ Laravel Policies;
+* ☑ protected Next.js routes.
+
+**Phase 1 status: complete, 2026-08-27.** Backend: `roles`/`permissions`/
+`role_permissions`/`user_roles` tables, `Scope` and `PermissionName` backed enums,
+`RolePermissionSeeder` (7 roles, full §11 permission list, a default capability set per
+role), `$user->hasPermission()`/`hasRole()` wired into Laravel's Gate via `Gate::before`,
+`UserRolePolicy` plus `/api/v1/users/{user}/roles` to grant/revoke, `hrm:install` to
+bootstrap the first Admin (§148 #1), `/api/v1/auth/{forgot-password,reset-password}`
+reusing Fortify's own password-reset action, and `/auth/me` + the login response now
+include the caller's roles and resolved permissions. Frontend: the Sanctum token lives in
+an httpOnly cookie set by a Next.js Route Handler proxy (§92.3) — a real login page with
+the 2FA-challenge branch, forgot/reset-password pages, `(dashboard)/layout.tsx` redirects
+unauthenticated visitors to `/login`, `/login` redirects an already-authenticated visitor
+back — all verified with Playwright against the real backend, not mocks. 86 backend tests
+pass on MySQL, `vendor/bin/phpstan`/`pint` clean, frontend builds/lints/type-checks clean.
+Both repos pushed; backend CI green.
+
+Scope resolution — turning a permission grant into an actual employee-ID set — is
+deliberately **not** built yet: `scopesFor()` on `HasRoles` exposes the grants (permission,
+scope, scope_id) for a future `ScopeResolver` to consume, but there is no `Employee`,
+`Team`, or `Department` table for it to resolve against until Phase 2. Don't be surprised
+that a `TEAM`-scoped grant doesn't yet filter anything — that's Phase 2's job.
 
 **Dependency:** Phase 0.
 
