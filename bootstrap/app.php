@@ -1,7 +1,10 @@
 <?php
 
+use App\Exceptions\AttendanceConflictException;
+use App\Exceptions\AttendanceWindowException;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Resources\Api\V1\AttendanceRecordResource;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -43,6 +46,31 @@ return Application::configure(basePath: dirname(__DIR__))
                 'errors' => $e->errors(),
                 'code' => 'VALIDATION_FAILED',
             ], $e->status);
+        });
+
+        // docs/PRD.md §139.5 — the existing record travels in `data` so the
+        // frontend can render correct state from the error alone.
+        $exceptions->render(function (AttendanceConflictException $e, Request $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
+            return response()->json([
+                'message' => $e->getMessage(),
+                'code' => $e->errorCode,
+                'data' => $e->record ? new AttendanceRecordResource($e->record) : null,
+            ], 409);
+        });
+
+        $exceptions->render(function (AttendanceWindowException $e, Request $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
+            return response()->json([
+                'message' => $e->getMessage(),
+                'code' => 'OUTSIDE_CHECKIN_WINDOW',
+            ], 422);
         });
 
         $exceptions->render(function (AuthenticationException $e, Request $request) {

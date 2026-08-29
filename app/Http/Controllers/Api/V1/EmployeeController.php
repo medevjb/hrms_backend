@@ -44,18 +44,23 @@ class EmployeeController extends Controller
             $query->whereIn('id', $allowedIds);
         }
 
-        if ($status = $request->query('filter.status')) {
+        // input(), not query(): Symfony's ParameterBag::get() (what query()
+        // calls) has no dot-notation support, so 'filter.status' against a
+        // real ?filter[status]=X request always returned null here — silent
+        // no-op filters, never caught because no test sent a bracket query
+        // string. input() goes through data_get(), which does support it.
+        if ($status = $request->input('filter.status')) {
             $query->where('status', $status);
         }
 
-        if ($teamId = $request->query('filter.team_id')) {
+        if ($teamId = $request->input('filter.team_id')) {
             $query->whereHas(
                 'currentTeamMembership',
                 fn ($q) => $q->where('team_id', $teamId),
             );
         }
 
-        if ($departmentId = $request->query('filter.department_id')) {
+        if ($departmentId = $request->input('filter.department_id')) {
             $query->whereHas(
                 'currentTeamMembership.team',
                 fn ($q) => $q->where('department_id', $departmentId),

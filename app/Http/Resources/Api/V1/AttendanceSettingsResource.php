@@ -19,6 +19,7 @@ class AttendanceSettingsResource extends JsonResource
             'auto_absent_enabled' => $this->auto_absent_enabled,
             'missing_checkout_policy' => $this->missing_checkout_policy->value,
             'attendance_min_minutes_half_day' => $this->attendance_min_minutes_half_day,
+            'attendance_checkin_window_minutes' => $this->attendance_checkin_window_minutes,
         ];
     }
 }

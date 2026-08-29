@@ -23,6 +23,7 @@ class UpdateAttendanceSettingsRequest extends FormRequest
             'auto_absent_enabled' => ['sometimes', 'boolean'],
             'missing_checkout_policy' => ['sometimes', Rule::enum(MissingCheckoutPolicy::class)],
             'attendance_min_minutes_half_day' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'attendance_checkin_window_minutes' => ['sometimes', 'integer', 'min:1', 'max:720'],
         ];
     }
 }

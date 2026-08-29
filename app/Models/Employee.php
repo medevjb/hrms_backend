@@ -147,4 +147,12 @@ class Employee extends Model
     {
         return $this->currentShiftAssignment?->shift;
     }
+
+    /**
+     * @return HasMany<AttendanceRecord, $this>
+     */
+    public function attendanceRecords(): HasMany
+    {
+        return $this->hasMany(AttendanceRecord::class);
+    }
 }

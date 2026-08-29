@@ -2,6 +2,7 @@
 
 use App\Enums\PermissionName;
 use App\Enums\Scope;
+use App\Models\OrganizationSettings;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
@@ -35,6 +36,17 @@ test('auth/me returns empty roles and permissions for a user with no grants', fu
 
     $response->assertOk();
     $response->assertJson(['data' => ['roles' => [], 'permissions' => []]]);
+});
+
+test('auth/me includes the organization timezone, even for a user with no grants (§142)', function () {
+    OrganizationSettings::current()->update(['timezone' => 'Asia/Dhaka']);
+    $user = User::factory()->create();
+    $token = $user->createToken('phpunit')->plainTextToken;
+
+    $response = $this->withHeader('Authorization', "Bearer {$token}")->getJson('/api/v1/auth/me');
+
+    $response->assertOk();
+    $response->assertJsonPath('data.organization.timezone', 'Asia/Dhaka');
 });
 
 test('login response also includes roles and permissions', function () {

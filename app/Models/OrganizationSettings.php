@@ -40,6 +40,7 @@ use Illuminate\Support\Facades\Cache;
  * @property bool $auto_absent_enabled
  * @property MissingCheckoutPolicy $missing_checkout_policy
  * @property int|null $attendance_min_minutes_half_day
+ * @property int $attendance_checkin_window_minutes
  * @property int $leave_year_start_month
  * @property int|null $leave_carry_forward_cap_days
  */
@@ -51,7 +52,7 @@ use Illuminate\Support\Facades\Cache;
     'hourly_overtime_enabled', 'overtime_full_day_minutes', 'overtime_daily_salary_basis',
     'overtime_hourly_rate_mode', 'overtime_hourly_fixed_rate', 'overtime_hourly_multiplier',
     'auto_absent_enabled', 'missing_checkout_policy', 'attendance_min_minutes_half_day',
-    'leave_year_start_month', 'leave_carry_forward_cap_days',
+    'attendance_checkin_window_minutes', 'leave_year_start_month', 'leave_carry_forward_cap_days',
 ])]
 class OrganizationSettings extends Model
 {
@@ -81,6 +82,7 @@ class OrganizationSettings extends Model
         'overtime_hourly_multiplier' => 1.0,
         'auto_absent_enabled' => true,
         'missing_checkout_policy' => 'LEAVE_OPEN',
+        'attendance_checkin_window_minutes' => 240, // §136 default
         'leave_year_start_month' => 1,
     ];
 

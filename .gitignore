@@ -17,6 +17,7 @@
 .env.production
 .phpactor.json
 .phpunit.result.cache
+/test-results
 Homestead.json
 Homestead.yaml
 npm-debug.log

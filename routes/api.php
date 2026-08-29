@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AttendanceController;
 use App\Http\Controllers\Api\V1\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Api\V1\Auth\NewPasswordController;
 use App\Http\Controllers\Api\V1\Auth\PasswordResetLinkController;
@@ -67,6 +68,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('holidays', [HolidayController::class, 'store'])->name('holidays.store');
     Route::put('holidays/{holiday}', [HolidayController::class, 'update'])->name('holidays.update');
     Route::delete('holidays/{holiday}', [HolidayController::class, 'destroy'])->name('holidays.destroy');
+
+    Route::get('attendance/today', [AttendanceController::class, 'today'])->name('attendance.today');
+    Route::post('attendance/check-in', [AttendanceController::class, 'checkIn'])->name('attendance.check-in');
+    Route::post('attendance/check-out', [AttendanceController::class, 'checkOut'])->name('attendance.check-out');
+    Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance.index');
+    Route::patch('attendance/{attendanceRecord}/adjust', [AttendanceController::class, 'adjust'])
+        ->name('attendance.adjust');
 
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::get('organization', [SettingsController::class, 'organization'])->name('organization.show');
