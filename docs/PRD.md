@@ -3748,16 +3748,78 @@ session already makes instead.
 
 Implement:
 
-* leave types;
-* policy;
-* balances;
-* leave request;
-* Team Leader approval;
-* Operation Manager approval;
-* HR approval;
-* direct Head HR/Admin approval;
-* cancellation;
-* attendance integration.
+* ☑ leave types;
+* ☑ policy;
+* ☑ balances;
+* ☑ leave request;
+* ☑ Team Leader approval;
+* ☑ Operation Manager approval;
+* ☑ HR approval;
+* ☑ direct Head HR/Admin approval;
+* ☑ cancellation;
+* ☑ attendance integration.
+
+**Phase 5 status: complete, 2026-08-29.** Backend: `leave_types` (§35/§36 policy
+config)/`leave_balances`/`leave_balance_transactions` (§144's auditable ledger — the
+`balance` column is a cached sum, always reconstructible by replaying transactions)/
+`leave_requests`/`leave_request_approvals` tables. `LeaveBalanceService` owns every
+balance movement (`ACCRUAL`/`CARRY_FORWARD`/`EXPIRY`/`APPROVAL`/`CANCELLATION`/
+`ADJUSTMENT`) and lazily bootstraps a balance the first time anything asks for
+it — accrual (UPFRONT or MONTHLY, §144), mid-year proration to the nearest 0.5 day, and
+back-filled monthly credits are all idempotent by a `note` string on the transaction row,
+so a re-query or a missed cron tick never double-credits. `leave:rollover` (scheduled
+daily at 01:00, a no-op except on the organization's actual leave-year start date) is
+§144's carry-forward/expiry job.
+
+`LeaveService::submit()` validates §36 policy (half-day support, `min_employment_days`
+gating *use* not accrual, `max_consecutive_days`), rejects overlapping requests, and
+routes the approval chain by the *requester's own role* per §41 — `required_stages` is
+snapshotted onto the request at submission so a later role change never rewrites a
+request already in flight. §41's table doesn't say what an Admin's own leave needs;
+mirroring Head HR's row (Head HR → Admin) the other direction — Admin's leave needs one
+Head HR sign-off — is a documented assumption, not a gap. HR/HEAD_HR/ADMIN are all
+"final approval" tiers per §38 ("final approval still belongs to HR/Head HR"): whichever
+one is a request's last stage resolves it straight to `HR_APPROVED`, never a status this
+enum doesn't have. The balance is debited only on that final approval, never at
+submission (§37's formula reads "Approved Leave", not "requested") — `LeaveRequestPolicy`
+gates each stage: TEAM_LEADER/OPERATION_MANAGER strictly to the request's own org-chart
+person, HR/HEAD_HR/ADMIN by role with senior roles able to act at a junior tier (Head HR
+can approve at the HR stage). §40 direct approval bypasses the remaining chain in one
+call, recording the bypassed stages, reason, approver, and timestamp for audit.
+Cancellation (§39/§144) credits back only the future-dated portion of an approved
+request — days already lived through keep their attendance record.
+
+§137's `AttendanceService::hasApprovedLeave()` seam (hard-coded `false` since Phase 4) is
+real now. §138 connects half-day leave to attendance for the first time in this PRD's
+history: a FIRST_HALF leave moves the *effective* shift start to the midpoint (and grace
+with it) for classify() and the nightly close, so an employee arriving for their working
+half isn't marked late against the shift's nominal start; a day with both an approved
+half-day leave and a valid half-day of attendance (worked minutes ≥
+`attendance_min_minutes_half_day`) closes `HALF_DAY` and fully paid, otherwise `ABSENT`.
+A full-day leave still suppresses the check-in prompt outright; a half-day one doesn't —
+the employee is still expected for the other half. Frontend: a `/leave` page — "My
+requests" (submit, cancel) always visible, "Approvals" (approve/reject/direct-approve)
+gated on `leave.approve`, "Leave types" (CRUD) gated on `leave.policy.manage` — plus a
+balance summary strip and a new Settings → Leave tab for `leave_year_start_month`/
+`leave_carry_forward_cap_days`. 269 backend tests pass (33 new), `phpstan`/`pint` clean;
+frontend typecheck/lint/build clean.
+
+Two real bugs, both from the same root cause already documented in §105: this app casts
+Eloquent dates through `CarbonImmutable`, and several new methods (`LeaveBalanceService`'s
+`leaveYearFor()`/`proratedAllocation()`, `LeaveService::estimateDays()`) were typed against
+the mutable `Carbon` class specifically, throwing the moment a real `employee->joining_date`
+or `request->start_date` was passed in — fixed the same way §105 did, by typing against
+`Carbon\CarbonInterface`. A subtler variant of the same issue: two loops (`estimateDays()`'s
+day-by-day walk, `accrueThroughToday()`'s month-by-month walk) called `->addDay()`/
+`->addMonthNoOverflow()` as a bare statement expecting in-place mutation — harmless against
+a `Carbon`, but silently a no-op (and therefore an infinite loop) against a
+`CarbonImmutable`, since immutable methods return a new instance instead of mutating.
+Fixed by forcing the loop cursor to a real mutable `Carbon` via `Carbon::parse()` up front,
+not just widening the type hint. Third, not a bug but a correction to this section's own
+first draft: §144's worked example (a 2026-04-15 joiner, January leave year, "15 × 9/12")
+counts *calendar* months touched (April through December) as "remaining months", not the
+~8.5 exact elapsed months between the two dates — `proratedAllocation()` anchors the
+diff to the joining *month's* start, not the joining day, to match.
 
 **Dependency:** Phase 4.
 
