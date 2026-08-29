@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Settings\UpdateAttendanceSettingsRequest;
+use App\Http\Requests\Api\V1\Settings\UpdateLeaveSettingsRequest;
 use App\Http\Requests\Api\V1\Settings\UpdateOrganizationSettingsRequest;
 use App\Http\Requests\Api\V1\Settings\UpdateOvertimeSettingsRequest;
 use App\Http\Requests\Api\V1\Settings\UpdatePayrollSettingsRequest;
 use App\Http\Resources\Api\V1\AttendanceSettingsResource;
+use App\Http\Resources\Api\V1\LeaveSettingsResource;
 use App\Http\Resources\Api\V1\OrganizationSettingsResource;
 use App\Http\Resources\Api\V1\OvertimeSettingsResource;
 use App\Http\Resources\Api\V1\PayrollSettingsResource;
@@ -89,5 +91,22 @@ class SettingsController extends Controller
         $settings->update($request->validated());
 
         return ApiResponse::data(new PayrollSettingsResource($settings->fresh()));
+    }
+
+    public function leave(): JsonResponse
+    {
+        Gate::authorize('leave', OrganizationSettings::class);
+
+        return ApiResponse::data(new LeaveSettingsResource(OrganizationSettings::current()));
+    }
+
+    public function updateLeave(UpdateLeaveSettingsRequest $request): JsonResponse
+    {
+        Gate::authorize('leave', OrganizationSettings::class);
+
+        $settings = OrganizationSettings::current();
+        $settings->update($request->validated());
+
+        return ApiResponse::data(new LeaveSettingsResource($settings->fresh()));
     }
 }

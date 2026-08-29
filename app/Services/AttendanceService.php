@@ -6,12 +6,15 @@ use App\Enums\AttendanceEventType;
 use App\Enums\AttendanceSource;
 use App\Enums\AttendanceStatus;
 use App\Enums\EmployeeStatus;
+use App\Enums\HalfDayPeriod;
+use App\Enums\LeaveStatus;
 use App\Enums\MissingCheckoutPolicy;
 use App\Exceptions\AttendanceConflictException;
 use App\Exceptions\AttendanceWindowException;
 use App\Models\AttendanceEvent;
 use App\Models\AttendanceRecord;
 use App\Models\Employee;
+use App\Models\LeaveRequest;
 use App\Models\OrganizationSettings;
 use App\Models\User;
 use App\Support\AttendanceCloseSummary;
@@ -39,13 +42,15 @@ class AttendanceService
     {
         $settings = OrganizationSettings::current();
         $workDate = $this->orgToday($now ?? Carbon::now(), $settings);
-        $resolution = $this->shifts->resolveForDate($employee, $workDate);
+        $resolution = $this->applyHalfDayAdjustment($employee, $workDate, $this->shifts->resolveForDate($employee, $workDate));
 
         $record = $this->findRecord($employee, $workDate);
-        $hasApprovedLeave = $this->hasApprovedLeave($employee, $workDate);
+        $hasApprovedLeave = $this->hasApprovedFullDayLeave($employee, $workDate);
 
         // §137 "check-in prompt suppression": never prompt on a weekend,
-        // holiday, or approved-leave day, or once a check-in already exists.
+        // holiday, or full-day-approved-leave day, or once a check-in
+        // already exists. A half-day leave (§138) does NOT suppress the
+        // prompt — the employee is still expected for the other half.
         $shouldPrompt = $record === null
             && $resolution->isWorkDay
             && ! $hasApprovedLeave;
@@ -85,6 +90,7 @@ class AttendanceService
         }
 
         [$workDate, $resolution] = $match;
+        $resolution = $this->applyHalfDayAdjustment($employee, $workDate, $resolution);
 
         $record = $this->findOrInitializeRecord($employee, $workDate, $resolution);
 
@@ -267,7 +273,8 @@ class AttendanceService
                 continue;
             }
 
-            $resolution = $this->shifts->resolveForDate($employee, $workDate);
+            $resolution = $this->applyHalfDayAdjustment($employee, $workDate, $this->shifts->resolveForDate($employee, $workDate));
+            $halfDayLeave = $this->approvedHalfDayLeave($employee, $workDate);
 
             $attributes = [
                 'shift_id' => $resolution->shift?->id,
@@ -282,9 +289,29 @@ class AttendanceService
             } elseif ($resolution->isWeekend) {
                 $attributes['status'] = AttendanceStatus::Weekend;
                 $weekend++;
-            } elseif ($this->hasApprovedLeave($employee, $workDate)) {
+            } elseif ($this->hasApprovedFullDayLeave($employee, $workDate)) {
                 $attributes['status'] = AttendanceStatus::OnLeave;
                 $onLeave++;
+            } elseif ($halfDayLeave !== null) {
+                // §138 — half-day leave + a valid half-day of attendance is
+                // HALF_DAY (fully paid); below the threshold the worked
+                // half doesn't count and the day falls to ABSENT.
+                $workedMinutes = $record?->check_in !== null
+                    ? ($record->worked_minutes ?? (
+                        $record->check_out !== null
+                            ? (int) $record->check_in->diffInMinutes($record->check_out)
+                            : 0
+                    ))
+                    : 0;
+                $halfDayThreshold = $settings->attendance_min_minutes_half_day ?? 0;
+
+                if ($record?->check_in !== null && $workedMinutes >= $halfDayThreshold) {
+                    $attributes['status'] = AttendanceStatus::HalfDay;
+                    $halfDay++;
+                } else {
+                    $attributes['status'] = AttendanceStatus::Absent;
+                    $absent++;
+                }
             } elseif ($record === null || $record->check_in === null) {
                 $attributes['status'] = AttendanceStatus::Absent;
                 $absent++;
@@ -416,13 +443,69 @@ class AttendanceService
     }
 
     /**
-     * Phase 5 seam — no LeaveRequest table exists yet, so this is always
-     * false until leave requests do, mirroring how ScopeResolver stubbed
-     * HR_SCOPE as unrestricted before Department/Team existed.
+     * §137/§138 — a FULL-day approved leave suppresses the check-in prompt
+     * and, once nightly close runs, produces ON_LEAVE outright. A half-day
+     * leave does neither — see approvedHalfDayLeave().
      */
-    private function hasApprovedLeave(Employee $employee, Carbon $workDate): bool
+    private function hasApprovedFullDayLeave(Employee $employee, Carbon $workDate): bool
     {
-        return false;
+        return LeaveRequest::query()
+            ->where('employee_id', $employee->id)
+            ->where('status', LeaveStatus::HrApproved)
+            ->where('is_half_day', false)
+            ->where('start_date', '<=', $workDate->toDateString())
+            ->where('end_date', '>=', $workDate->toDateString())
+            ->exists();
+    }
+
+    /**
+     * §138 — a half-day request only ever spans a single work day (§37's
+     * LeaveService::submit() enforces start_date === end_date for one), so
+     * this can never match more than one row.
+     */
+    private function approvedHalfDayLeave(Employee $employee, Carbon $workDate): ?LeaveRequest
+    {
+        return LeaveRequest::query()
+            ->where('employee_id', $employee->id)
+            ->where('status', LeaveStatus::HrApproved)
+            ->where('is_half_day', true)
+            ->where('start_date', $workDate->toDateString())
+            ->first();
+    }
+
+    /**
+     * §138 — a FIRST_HALF leave means the employee is only expected from
+     * the shift midpoint onward, so grace (§16) applies from that adjusted
+     * start instead of the nominal one. A SECOND_HALF leave doesn't move
+     * the start (they still arrive on time); closeWorkDate() judges that
+     * case purely on worked-minutes against the half-day threshold.
+     */
+    private function applyHalfDayAdjustment(Employee $employee, Carbon $workDate, ShiftResolution $resolution): ShiftResolution
+    {
+        $leave = $this->approvedHalfDayLeave($employee, $workDate);
+
+        if ($leave === null
+            || $leave->half_day_period !== HalfDayPeriod::FirstHalf
+            || $resolution->shiftStart === null
+            || $resolution->shiftEnd === null) {
+            return $resolution;
+        }
+
+        $midpoint = $resolution->shiftStart->copy()->addMinutes(
+            (int) ($resolution->shiftStart->diffInMinutes($resolution->shiftEnd) / 2),
+        );
+
+        return new ShiftResolution(
+            workDate: $resolution->workDate,
+            isWorkDay: $resolution->isWorkDay,
+            isHoliday: $resolution->isHoliday,
+            isWeekend: $resolution->isWeekend,
+            shift: $resolution->shift,
+            shiftStart: $midpoint,
+            shiftEnd: $resolution->shiftEnd,
+            graceMinutes: $resolution->graceMinutes,
+            graceEnd: $resolution->graceMinutes !== null ? $midpoint->copy()->addMinutes($resolution->graceMinutes) : null,
+        );
     }
 
     /**

@@ -8,6 +8,9 @@ use App\Http\Controllers\Api\V1\Auth\TwoFactorAuthenticatedSessionController;
 use App\Http\Controllers\Api\V1\DepartmentController;
 use App\Http\Controllers\Api\V1\EmployeeController;
 use App\Http\Controllers\Api\V1\HolidayController;
+use App\Http\Controllers\Api\V1\LeaveBalanceController;
+use App\Http\Controllers\Api\V1\LeaveRequestController;
+use App\Http\Controllers\Api\V1\LeaveTypeController;
 use App\Http\Controllers\Api\V1\SettingsController;
 use App\Http\Controllers\Api\V1\ShiftController;
 use App\Http\Controllers\Api\V1\ShiftOverrideController;
@@ -76,6 +79,27 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('attendance/{attendanceRecord}/adjust', [AttendanceController::class, 'adjust'])
         ->name('attendance.adjust');
 
+    Route::get('leave-types', [LeaveTypeController::class, 'index'])->name('leave-types.index');
+    Route::post('leave-types', [LeaveTypeController::class, 'store'])->name('leave-types.store');
+    Route::put('leave-types/{leaveType}', [LeaveTypeController::class, 'update'])->name('leave-types.update');
+    Route::delete('leave-types/{leaveType}', [LeaveTypeController::class, 'destroy'])->name('leave-types.destroy');
+
+    Route::get('leave-balances', [LeaveBalanceController::class, 'index'])->name('leave-balances.index');
+    Route::patch('leave-balances/{leaveBalance}/adjust', [LeaveBalanceController::class, 'adjust'])
+        ->name('leave-balances.adjust');
+
+    Route::get('leave-requests', [LeaveRequestController::class, 'index'])->name('leave-requests.index');
+    Route::post('leave-requests', [LeaveRequestController::class, 'store'])->name('leave-requests.store');
+    Route::get('leave-requests/{leaveRequest}', [LeaveRequestController::class, 'show'])->name('leave-requests.show');
+    Route::post('leave-requests/{leaveRequest}/approve', [LeaveRequestController::class, 'approve'])
+        ->name('leave-requests.approve');
+    Route::post('leave-requests/{leaveRequest}/reject', [LeaveRequestController::class, 'reject'])
+        ->name('leave-requests.reject');
+    Route::post('leave-requests/{leaveRequest}/direct-approve', [LeaveRequestController::class, 'directApprove'])
+        ->name('leave-requests.direct-approve');
+    Route::post('leave-requests/{leaveRequest}/cancel', [LeaveRequestController::class, 'cancel'])
+        ->name('leave-requests.cancel');
+
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::get('organization', [SettingsController::class, 'organization'])->name('organization.show');
         Route::put('organization', [SettingsController::class, 'updateOrganization'])->name('organization.update');
@@ -85,5 +109,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('overtime', [SettingsController::class, 'updateOvertime'])->name('overtime.update');
         Route::get('payroll', [SettingsController::class, 'payroll'])->name('payroll.show');
         Route::put('payroll', [SettingsController::class, 'updatePayroll'])->name('payroll.update');
+        Route::get('leave', [SettingsController::class, 'leave'])->name('leave.show');
+        Route::put('leave', [SettingsController::class, 'updateLeave'])->name('leave.update');
     });
 });

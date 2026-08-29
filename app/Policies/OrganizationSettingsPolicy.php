@@ -33,4 +33,9 @@ class OrganizationSettingsPolicy
     {
         return $user->hasPermission(PermissionName::PayrollSettingsManage);
     }
+
+    public function leave(User $user): bool
+    {
+        return $user->hasPermission(PermissionName::LeavePolicyManage);
+    }
 }

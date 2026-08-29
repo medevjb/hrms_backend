@@ -55,6 +55,9 @@ test('GET attendance/today returns the resolved context for the caller\'s own em
 });
 
 test('checking in creates a record for the authenticated employee', function () {
+    // Pinned inside the shift's check-in window — this endpoint reads the
+    // real clock, and the window is only a few hours wide around the shift.
+    Carbon::setTestNow('2026-08-24 09:05:00');
     $employee = Employee::factory()->create();
     $shift = Shift::factory()->create(['start_time' => '09:00:00', 'end_time' => '18:00:00']);
     EmployeeShift::factory()->create(['employee_id' => $employee->id, 'shift_id' => $shift->id, 'started_at' => '2026-01-01']);
@@ -64,9 +67,12 @@ test('checking in creates a record for the authenticated employee', function () 
     $response->assertStatus(201);
     $response->assertJsonPath('data.employee.id', $employee->id);
     expect(AttendanceRecord::query()->where('employee_id', $employee->id)->exists())->toBeTrue();
+
+    Carbon::setTestNow();
 });
 
 test('a duplicate check-in returns 409 with the existing record attached', function () {
+    Carbon::setTestNow('2026-08-24 09:05:00');
     $employee = Employee::factory()->create();
     $shift = Shift::factory()->create(['start_time' => '09:00:00']);
     EmployeeShift::factory()->create(['employee_id' => $employee->id, 'shift_id' => $shift->id, 'started_at' => '2026-01-01']);
@@ -77,6 +83,8 @@ test('a duplicate check-in returns 409 with the existing record attached', funct
     $response->assertStatus(409);
     $response->assertJsonPath('code', 'ALREADY_CHECKED_IN');
     $response->assertJsonPath('data.employee.id', $employee->id);
+
+    Carbon::setTestNow();
 });
 
 test('checking out without checking in returns 409', function () {
@@ -89,6 +97,7 @@ test('checking out without checking in returns 409', function () {
 });
 
 test('check-in then check-out succeeds and computes worked minutes', function () {
+    Carbon::setTestNow('2026-08-24 09:05:00');
     $employee = Employee::factory()->create();
     $shift = Shift::factory()->create(['start_time' => '09:00:00']);
     EmployeeShift::factory()->create(['employee_id' => $employee->id, 'shift_id' => $shift->id, 'started_at' => '2026-01-01']);
@@ -98,6 +107,8 @@ test('check-in then check-out succeeds and computes worked minutes', function ()
 
     $response->assertOk();
     expect($response->json('data.worked_minutes'))->toBeInt();
+
+    Carbon::setTestNow();
 });
 
 test('listing attendance requires attendance.view', function () {
