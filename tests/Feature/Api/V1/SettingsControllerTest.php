@@ -67,18 +67,31 @@ test('late_grace_minutes must be between 0 and 120', function () {
         ->assertJsonValidationErrors(['late_grace_minutes']);
 });
 
-test('a user with overtime.policy.manage can update overtime settings', function () {
+test('hourly overtime is disabled by default (§47)', function () {
+    $user = userWithSettingsPermission(PermissionName::OvertimePolicyManage);
+
+    $this->actingAs($user)->getJson('/api/v1/settings/overtime')
+        ->assertOk()
+        ->assertJsonPath('data.hourly_overtime_enabled', false)
+        ->assertJsonPath('data.overtime_enabled', true)
+        ->assertJsonPath('data.weekend_overtime_enabled', true)
+        ->assertJsonPath('data.holiday_overtime_enabled', true);
+});
+
+test('a user with overtime.policy.manage can update overtime settings, including enabling hourly overtime', function () {
     $user = userWithSettingsPermission(PermissionName::OvertimePolicyManage);
 
     $response = $this->actingAs($user)->putJson('/api/v1/settings/overtime', [
         'hourly_overtime_enabled' => true,
         'overtime_hourly_rate_mode' => 'FIXED',
         'overtime_hourly_fixed_rate' => '250.5000',
+        'overtime_full_day_minutes' => 420,
     ]);
 
     $response->assertOk();
     $response->assertJsonPath('data.hourly_overtime_enabled', true);
     $response->assertJsonPath('data.overtime_hourly_rate_mode', 'FIXED');
+    $response->assertJsonPath('data.overtime_full_day_minutes', 420);
 });
 
 test('a user with payroll.settings.manage can update the payroll cutoff day', function () {

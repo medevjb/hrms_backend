@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\HolidayController;
 use App\Http\Controllers\Api\V1\LeaveBalanceController;
 use App\Http\Controllers\Api\V1\LeaveRequestController;
 use App\Http\Controllers\Api\V1\LeaveTypeController;
+use App\Http\Controllers\Api\V1\OvertimeController;
 use App\Http\Controllers\Api\V1\SettingsController;
 use App\Http\Controllers\Api\V1\ShiftController;
 use App\Http\Controllers\Api\V1\ShiftOverrideController;
@@ -99,6 +100,15 @@ Route::middleware('auth:sanctum')->group(function () {
         ->name('leave-requests.direct-approve');
     Route::post('leave-requests/{leaveRequest}/cancel', [LeaveRequestController::class, 'cancel'])
         ->name('leave-requests.cancel');
+
+    Route::get('overtime', [OvertimeController::class, 'index'])->name('overtime.index');
+    Route::get('overtime/{overtimeRecord}', [OvertimeController::class, 'show'])->name('overtime.show');
+    Route::post('overtime/{overtimeRecord}/approve', [OvertimeController::class, 'approve'])
+        ->name('overtime.approve');
+    Route::post('overtime/{overtimeRecord}/reject', [OvertimeController::class, 'reject'])
+        ->name('overtime.reject');
+    Route::patch('overtime/{overtimeRecord}/adjust', [OvertimeController::class, 'adjust'])
+        ->name('overtime.adjust');
 
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::get('organization', [SettingsController::class, 'organization'])->name('organization.show');

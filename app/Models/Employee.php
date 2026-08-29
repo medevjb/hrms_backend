@@ -171,4 +171,12 @@ class Employee extends Model
     {
         return $this->hasMany(LeaveBalance::class);
     }
+
+    /**
+     * @return HasMany<OvertimeRecord, $this>
+     */
+    public function overtimeRecords(): HasMany
+    {
+        return $this->hasMany(OvertimeRecord::class);
+    }
 }

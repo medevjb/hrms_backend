@@ -3,12 +3,14 @@
 use App\Enums\AttendanceSource;
 use App\Enums\AttendanceStatus;
 use App\Enums\EmployeeStatus;
+use App\Enums\OvertimeStatus;
 use App\Enums\PermissionName;
 use App\Models\AttendanceRecord;
 use App\Models\Employee;
 use App\Models\EmployeeShift;
 use App\Models\Holiday;
 use App\Models\OrganizationSettings;
+use App\Models\OvertimeRecord;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Shift;
@@ -172,4 +174,28 @@ test('the close command sends exactly one summary notification, not one per empl
         return true;
     });
     Notification::assertCount(1);
+});
+
+test('the close command also detects overtime for a worked weekend day (§52)', function () {
+    OrganizationSettings::current()->update([
+        'weekend_days' => ['saturday', 'sunday'],
+        'overtime_enabled' => true,
+        'weekend_overtime_enabled' => true,
+        'overtime_full_day_minutes' => 480,
+    ]);
+
+    $employee = Employee::factory()->create(['status' => EmployeeStatus::Active, 'overtime_eligible' => true]);
+    $checkIn = Carbon::parse('2026-08-22 09:00:00'); // a Saturday
+    AttendanceRecord::factory()->create([
+        'employee_id' => $employee->id,
+        'work_date' => '2026-08-22',
+        'check_in' => $checkIn,
+        'check_out' => $checkIn->copy()->addMinutes(520),
+        'worked_minutes' => 520,
+    ]);
+
+    $this->artisan('attendance:close', ['date' => '2026-08-22'])->assertExitCode(0);
+
+    expect(OvertimeRecord::query()->where('employee_id', $employee->id)->sole()->status)
+        ->toBe(OvertimeStatus::PendingTeamLeader);
 });

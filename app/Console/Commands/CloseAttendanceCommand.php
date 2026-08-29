@@ -7,6 +7,7 @@ use App\Models\OrganizationSettings;
 use App\Models\User;
 use App\Notifications\AttendanceCloseSummary;
 use App\Services\AttendanceService;
+use App\Services\OvertimeService;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -27,7 +28,7 @@ use Illuminate\Support\Facades\Notification;
 #[Description("Close a work date's attendance: produce ABSENT/MISSING_CHECKOUT/HALF_DAY/WEEKEND/HOLIDAY records")]
 class CloseAttendanceCommand extends Command
 {
-    public function handle(AttendanceService $attendance): int
+    public function handle(AttendanceService $attendance, OvertimeService $overtime): int
     {
         $settings = OrganizationSettings::current();
 
@@ -36,6 +37,10 @@ class CloseAttendanceCommand extends Command
             : Carbon::now($settings->timezone)->subDay();
 
         $summary = $attendance->closeWorkDate($workDate);
+
+        // §52 — overtime detection reads the just-finalised attendance
+        // (WEEKEND/HOLIDAY status, worked_minutes) for the same date.
+        $overtimeSummary = $overtime->detectForWorkDate($workDate);
 
         $recipients = User::query()->get()->filter(
             fn (User $user) => $user->hasPermission(PermissionName::AttendanceManage),
@@ -50,6 +55,11 @@ class CloseAttendanceCommand extends Command
             "{$summary->missingCheckout} missing checkout, {$summary->halfDay} half day, ".
             "{$summary->weekend} weekend, {$summary->holiday} holiday, {$summary->onLeave} on leave, ".
             "{$summary->unchanged} unchanged, {$summary->skippedManualAdjustment} skipped (manual adjustment).",
+        );
+
+        $this->components->info(
+            "Overtime {$workDate->toDateString()}: {$overtimeSummary->detected} detected, ".
+            "{$overtimeSummary->rejectedInsufficientDuration} rejected (insufficient duration).",
         );
 
         return self::SUCCESS;
