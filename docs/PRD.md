@@ -479,32 +479,47 @@ fighting the diff.
 
 ---
 
-## 6.2 Mantine + Tailwind Coexistence
+## 6.2 shadcn/ui + Tailwind
 
-Both systems are in use. Without a boundary they will fight over resets, specificity,
-and spacing. The rules:
+**Reversed after Phase 3.** This section originally mandated Mantine, with Tailwind
+restricted to page-level layout, and told future agents to drop Tailwind before dropping
+Mantine if the boundary proved costly. Phases 0–3 shipped against that rule. The user then
+asked for a full visual/UX rebuild on shadcn/ui — a deliberate, explicit reversal of a
+documented decision, not scope creep — and every Phase 0–3 screen was rebuilt accordingly
+in the same pass, so there is no mixed-library debt left behind. Any UI requirement
+elsewhere in this document that names a Mantine component (§7, §100) means "the shadcn/ui
+equivalent" from here on.
+
+Current stack:
 
 ```text
-Mantine owns    components, theming, dark mode, spacing scale,
-                colours, typography, all form controls, dates,
-                charts, notifications, modals
-
-Tailwind owns   page-level layout only —
-                grid, flex, gap, width/height, responsive breakpoints
+tailwindcss v4          utility layer — Preflight enabled, no coexistence exclusion
+shadcn/ui (radix-nova)  component source lives in components/ui/*, generated via the
+                        shadcn CLI and then hand-edited like any other app code — it is
+                        not a package dependency to upgrade, it's checked-in source
+radix-ui                the underlying unstyled primitives shadcn/ui wraps
+lucide-react            icons (replaces @tabler/icons-react)
+sonner                  toasts (replaces @mantine/notifications)
+next-themes             light/dark mode (replaces @mantine/core's ColorSchemeScript)
+react-day-picker + date-fns   the date picker shadcn/ui wraps (replaces @mantine/dates)
+recharts                unchanged — already the engine behind shadcn's chart component
 ```
 
-Required setup:
+Rules:
 
-* Tailwind's **Preflight must be disabled** — it resets the elements Mantine styles.
-* Mantine's PostCSS preset runs alongside `@tailwindcss/postcss`.
-* Wrap the app in `MantineProvider` in `app/layout.tsx` with `ColorSchemeScript`.
-* One source of truth for design tokens: the Mantine theme object. Tailwind may read
-  those tokens; it must not define competing colour or spacing scales.
-* Never style a Mantine component's internals with Tailwind classes — use Mantine's
-  `styles` / `classNames` props or CSS modules.
-
-If this boundary proves costly in Phase 0, drop Tailwind rather than drop Mantine — the
-UI requirements in §7 and §100 are written against Mantine primitives.
+* Design tokens live as CSS custom properties in `app/globals.css` (`:root` / `.dark`),
+  wired into Tailwind via `@theme inline`. That file is the one source of truth for
+  color/radius/spacing — don't hand-roll competing values in component files.
+* `components/ui/*` is project source, not a vendored dependency — edit it directly
+  rather than fighting it with wrapper components, and don't `npx shadcn add --overwrite`
+  a file that's been customized without re-applying the customization.
+* The signature status language (`components/ui/status-chip.tsx` — a dot + label pill,
+  color-coded by semantic tone) is the one recurring visual motif across employee status,
+  shift active/inactive, holiday type, and settings save state. Reach for it before
+  inventing a new status representation.
+* Forms are plain controlled state (`useState` + a `zod` `safeParse` on submit), not
+  react-hook-form — `components/ui/form.tsx` exists from the CLI install but is unused;
+  keep it that way unless a form's complexity genuinely outgrows the simple pattern.
 
 ---
 
@@ -3636,19 +3651,19 @@ instance of it.
 
 Implement:
 
-* check-in;
-* checkout;
-* attendance events;
-* daily attendance record;
-* late calculation;
-* grace handling;
-* absence;
-* missing checkout;
-* manual correction;
-* manager attendance view;
-* attendance reports;
-* weekend work detection;
-* holiday work detection.
+* ☑ check-in;
+* ☑ checkout;
+* ☑ attendance events;
+* ☑ daily attendance record;
+* ☑ late calculation;
+* ☑ grace handling;
+* ☑ absence;
+* ☑ missing checkout;
+* ☑ manual correction;
+* ☑ manager attendance view;
+* ☑ attendance reports;
+* ☑ weekend work detection;
+* ☑ holiday work detection.
 
 Mandatory rule:
 
@@ -3657,6 +3672,73 @@ check_in <= shift_start + grace
 =
 NOT LATE
 ```
+
+**Phase 4 status: complete, 2026-08-27.** Backend: `attendance_events` (append-only
+punches)/`attendance_records` (one per employee per work_date, unique-constrained)/
+`attendance_adjustments` (§32 correction history) tables. `AttendanceService` is the whole
+domain: `today()` backs the check-in prompt (§137's suppression rules — never prompts on a
+weekend/holiday/leave day or once a check-in exists), `checkIn()`/`checkOut()` are
+idempotent (409 `ALREADY_CHECKED_IN` / `ALREADY_CHECKED_OUT` / `NOT_CHECKED_IN`, the
+existing record riding in `data` per §139.5), and `adjust()` is §32/§97 manual correction —
+recalculating late/status from the record's own already-snapshotted
+`shift_start_used`/`grace_minutes_used`, never from live settings, so a later grace-setting
+change can't retroactively rewrite history (§22/§95). §132's grace rule (`classify()`) is
+one nine-line method, exercised against every §115/§96 boundary case (08:59 through 09:30,
+grace at 0, exactly-at-grace-end).
+
+§136's overnight-shift work-date rule is real, not aspirational: `checkIn()` resolves both
+today's and yesterday's shift via `ShiftService`, and a punch attaches to whichever
+`[shift_start − N, shift_end + N]` window contains it (today wins on overlap), rejecting
+anything that fits neither with `422 OUTSIDE_CHECKIN_WINDOW` rather than silently guessing
+a day. `N` is `attendance_checkin_window_minutes` (default 240) — a setting §136 requires
+but §85's list never enumerated, so it's a new organization_settings column, same gap shape
+as the rest of §134.3's table.
+
+`attendance:close` (`CloseAttendanceCommand`, scheduled daily at 02:00 server time) is
+§137's nightly job — the only thing that ever produces `ABSENT`/`MISSING_CHECKOUT`/
+`HALF_DAY`/`WEEKEND`/`HOLIDAY`, since a check-in-born record only ever starts as
+`PRESENT`/`LATE`. Idempotent, skips any record already flagged `is_manual_adjustment`,
+honors `missing_checkout_policy` (`LEAVE_OPEN` vs `AUTO_CLOSE_AT_SHIFT_END`), reclassifies
+a checked-out-but-short day to `HALF_DAY` against `attendance_min_minutes_half_day`, and
+sends exactly one `AttendanceCloseSummary` database notification to every
+`attendance.manage` holder — not one per employee. `ON_LEAVE` is a documented Phase 5 seam
+(`hasApprovedLeave()` always false) — there's no `LeaveRequest` table yet, mirroring how
+`ScopeResolver` stubbed `HR_SCOPE` before Department/Team existed. Frontend: a global
+check-in dialog (mounted in the dashboard shell, §26) and a live today's-attendance card
+(§27, worked-time ticking client-side) built on the new design system, plus a scoped
+`/attendance` manager view (§33 filters, §99 report columns) with a manual-correction
+dialog gated on `attendance.correct`. 220 backend tests pass, `phpstan`/`pint` clean;
+frontend build/lint/type-check clean, and the full flow (check-in → duplicate rejection →
+check-out → listing → correction → nightly close → HR notification) was smoke-tested
+end-to-end through the real Next.js proxy against the live backend.
+
+Two real bugs surfaced by that smoke test, not the test suite. First: `AttendanceService`
+type-hinted `Illuminate\Support\Carbon` throughout, but this app configures
+`Date::use(CarbonImmutable::class)` — every Eloquent-cast datetime read is actually a
+`CarbonImmutable`, which isn't a subtype of the mutable class, so passing a freshly-read
+`$record->check_in` into a `Carbon`-typed parameter threw a `TypeError` the moment
+`adjust()` tried to reclassify a correction. Fixed by typing against `Carbon\CarbonInterface`
+(what both classes implement) wherever a value might come from either construction path.
+Second, an operational one: `organization_settings` is a `Cache::rememberForever`'d
+singleton (§104's fix for a different caching bug), and a `rememberForever` entry never
+expires — so a cache entry written before this phase's new
+`attendance_checkin_window_minutes` column existed was simply missing that key, not
+null-with-a-default, and every check-in threw until the cache was forgotten. Fixed by
+having the migration itself forget the cache key; the same line belongs in any future
+migration that touches this table. Neither would have been caught by a unit test running
+against a fresh in-memory app boot, which is exactly why the live smoke-test pass matters.
+
+Also fixed in passing: `EmployeeController::index()`'s status/team/department filters used
+`$request->query('filter.status')`, which silently returns null against a real
+`?filter[status]=X` request — Symfony's `ParameterBag::get()` has no dot-notation support,
+unlike `$request->input()`, which resolves it through `data_get()`. No existing test ever
+sent a bracket-array query string, so this had been a silent no-op since Phase 2.
+`AttendanceController` was written the same way and hit the identical bug immediately;
+both are now fixed to use `input()`. And: `/auth/me` and the login response now carry
+`organization.timezone` — §142 makes the organization timezone authoritative for *display*,
+not just evaluation, but `/settings/organization` is `settings.manage`-gated and most
+employees reading a check-in time don't hold it, so it rides on the one request every
+session already makes instead.
 
 **Dependency:** Phase 3.
 
