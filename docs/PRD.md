@@ -3829,13 +3829,13 @@ diff to the joining *month's* start, not the joining day, to match.
 
 Implement:
 
-* weekend overtime;
-* holiday overtime;
-* overtime eligibility;
-* minimum duration;
-* approvals;
-* manual adjustments;
-* hourly overtime architecture.
+* ☑ weekend overtime;
+* ☑ holiday overtime;
+* ☑ overtime eligibility;
+* ☑ minimum duration;
+* ☑ approvals;
+* ☑ manual adjustments;
+* ☑ hourly overtime architecture.
 
 Default:
 
@@ -3846,6 +3846,53 @@ ON
 Hourly Overtime:
 OFF
 ```
+
+**Phase 6 status: complete, 2026-08-29.** Backend: `overtime_records` / `overtime_approvals`
+tables. The overtime *settings* (`overtime_enabled`, `weekend/holiday/hourly` toggles,
+`overtime_full_day_minutes`, `overtime_daily_salary_basis`, `overtime_hourly_*`) and the
+`employees.overtime_eligible` flag already existed from Phase 3/2 — this phase builds the
+records/approvals domain on top and adds no `overtime_settings` table (§84 lists one, but
+every setting group is folded into the `organization_settings` singleton, §85).
+
+`OvertimeService::detectForWorkDate()` runs immediately after the §137 nightly close for the
+same date, so it reads finalised WEEKEND/HOLIDAY status and `worked_minutes` (§52 —
+attendance proves work, it doesn't authorise payment). For each overtime-eligible
+active employee whose day is a weekend (and `weekend_overtime_enabled`) or holiday (and
+`holiday_overtime_enabled`) with a full check-in/check-out pair (§44/§45 "Valid
+Attendance"): a day meeting `overtime_full_day_minutes` becomes a `DETECTED` candidate that
+enters the chain at `PENDING_TEAM_LEADER`; a day *below* it is still recorded, as
+`REJECTED (insufficient duration)` — §46 keeps "Half-Day Overtime: OFF" for V1, and §107
+open-question #7 says surface the short day, don't hide it, so HR can still grant it by
+hand. Detection is idempotent on `attendance_record_id` (unique), so a re-run or a manual
+`attendance:close` of an old date never duplicates or disturbs an in-flight record. The
+threshold is snapshotted onto each record (`full_day_minutes_used`) so a later settings
+change can't retro-reclassify a decided day (§95).
+
+Approval is the fixed §50 chain — TEAM_LEADER → OPERATION_MANAGER → HR — with none of
+leave's role-based branching (§41): every record, whoever it belongs to, walks the same
+three stages. `OvertimeRecordPolicy` gates the two org-chart stages to the one person the
+record's employee reports to and the HR stage by role; Admin and Head of HR may act at any
+pending stage ("exceptional authority", §50) and when they do, `OvertimeService::approve()`
+collapses whatever's left of the chain and approves outright — §90 defines no separate
+direct-approve route, so it's folded into `approve`. `PATCH /overtime/{id}/adjust` (§68,
+gated on `overtime.adjust` — Head of HR / Admin only) sets an inline
+`manual_days_override` with a reason, actor, and timestamp; a grant (> 0 days) on a
+`REJECTED` record moves it to `APPROVED` with no chain to re-walk. `effectiveOvertimeDays()`
+(override ?? detected) and `OvertimeService::approvedOvertimeDaysFor(employee, from, to)`
+are the seam Phase 8 payroll multiplies by daily salary (§67) — the money itself, the
+`PAYROLL_PROCESSED` status, and §72's `payroll_arrears` for a late approval all belong to
+Phase 8/9 and are deliberately untested here, mirroring how Phase 4 left
+`hasApprovedLeave()` a stub for Phase 5.
+
+`CloseAttendanceCommand` now runs detection right after the attendance close and reports
+both counts. Frontend: an `/overtime` page — "My overtime" (always), "Approvals"
+(approve/reject, gated `overtime.approve`), "All records" (gated `overtime.review`, with an
+Adjust action for `overtime.adjust` holders); overtime policy stays on the existing
+Settings → Overtime tab. 280 backend tests pass (27 new), 2 pre-existing Fortify skips;
+`phpstan` / `pint` clean; frontend typecheck / lint / build clean. No bugs of note this
+pass — the domain mirrors Phase 5's leave code closely enough that its `CarbonImmutable`
+traps (§105/§106) didn't recur (detection walks employees, not dates, so there's no
+date-cursor loop).
 
 **Dependency:** Phase 5.
 
