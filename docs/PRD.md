@@ -4192,14 +4192,46 @@ Admin/DevOps belongs to the `/system` Inertia console (Phase 12), not this front
 
 Implement:
 
-* CSV reports;
-* attendance report;
-* late report;
-* leave report;
-* overtime report;
-* payroll report;
-* employee documents;
-* private downloads.
+* ☑ CSV reports;
+* ☑ attendance report;
+* ☑ late report;
+* ☑ leave report;
+* ☑ overtime report;
+* ☑ payroll report;
+* ☑ employee documents;
+* ☑ private downloads.
+
+**Phase 11 status: complete, 2026-08-30.**
+
+**Reports (§99).** `ReportType` enum — the nine §99 reports (employee directory,
+attendance, late attendance, absence, leave, leave balance, overtime, payroll, payroll
+deductions). `ReportService` builds each into an `App\Support\Report` value object
+(columns + rows), narrowed to the employees the caller may see through `report.view`
+(§10) and to the date / department / team / employee filters. `GET /reports` lists the
+types; `GET /reports/{type}` returns a JSON preview (first 100 rows + total +
+`truncated`); `GET /reports/{type}/export` streams the full CSV (`report.export` — §11,
+"payroll data leaving the system"). The attendance report carries every §99 column
+(shift, grace minutes, grace end, actual check-in, late minutes). Rows are materialised
+into memory — fine for V1 scale; revisit with a cursor if the roster outgrows it.
+
+**Documents (§82).** `documents` table (§84), `DocumentCategory` enum. `GET|POST
+/employees/{id}/documents`, `GET /documents/{id}/download` (private stream, never a
+public URL), `DELETE /documents/{id}`. Files land in `storage/app/private/
+employee-documents/{employee_id}/` under a UUID name. `document.view` / `document.manage`
+gated and scoped; an employee always sees and downloads their own. Upload is a 10 MB
+multipart cap on pdf/jpg/png/doc/docx.
+
+**Frontend.** New `/reports` page — report picker, date + department filters, a
+preview table, and an Export CSV button for `report.export` holders. Employee detail
+page gains a Documents card (list, download, and, for `document.manage`, upload /
+delete). Sidebar gains an "Insights" group.
+
+`REPORT_EXPORTED` / `DOCUMENT_DOWNLOADED` audit entries (§83) land in Phase 12 with the
+rest of the audit log.
+
+369 backend tests pass (9 new: `ReportControllerTest`, `DocumentControllerTest`), 2
+pre-existing Fortify skips; `phpstan` / `pint` clean; frontend typecheck / lint / build
+clean.
 
 **Dependency:** Phase 10.
 
