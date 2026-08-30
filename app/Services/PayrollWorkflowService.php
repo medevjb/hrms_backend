@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AuditAction;
 use App\Enums\OvertimeStatus;
 use App\Enums\PayrollAcknowledgementStatus;
 use App\Enums\PayrollArrearSourceType;
@@ -109,10 +110,14 @@ class PayrollWorkflowService
         $dispute = DB::transaction(function () use ($entry, $actor, $reason) {
             $entry->update(['acknowledgement_status' => PayrollAcknowledgementStatus::Disputed]);
 
-            return $entry->disputes()->create([
+            $created = $entry->disputes()->create([
                 'raised_by_user_id' => $actor->id,
                 'reason' => $reason,
             ]);
+
+            app(AuditLogger::class)->record(AuditAction::PayrollDisputeRaised, $created, reason: $reason, actor: $actor);
+
+            return $created;
         });
 
         $reviewers = User::query()->get()->filter(
@@ -154,6 +159,11 @@ class PayrollWorkflowService
                     ? PayrollAcknowledgementStatus::Pending
                     : PayrollAcknowledgementStatus::Resolved,
             ]);
+
+            app(AuditLogger::class)->record(
+                AuditAction::PayrollDisputeResolved, $dispute,
+                newData: ['resolution' => $resolution->value], reason: $note, actor: $actor,
+            );
         });
 
         if ($dispute->entry->employee->user !== null) {
@@ -185,7 +195,7 @@ class PayrollWorkflowService
 
         abort_if($blocked > 0, 409, "{$blocked} payslip(s) have an unresolved dispute — resolve or defer them first.");
 
-        DB::transaction(function () use ($period) {
+        DB::transaction(function () use ($period, $actor) {
             foreach ($period->entries()->with(['employee', 'lines'])->get() as $entry) {
                 $this->generatePayslip($entry);
                 $entry->update(['status' => PayrollEntryStatus::Finalized, 'finalized_at' => Carbon::now()]);
@@ -199,6 +209,11 @@ class PayrollWorkflowService
             $this->arrears->markApplied($period);
 
             $period->update(['status' => PayrollPeriodStatus::Finalized, 'finalized_at' => Carbon::now()]);
+
+            app(AuditLogger::class)->record(
+                AuditAction::PayrollFinalized, $period,
+                newData: ['entries' => $period->entries()->count()], actor: $actor,
+            );
         });
 
         return $period->fresh();

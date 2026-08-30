@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AuditAction;
 use App\Enums\EmployeeStatus;
 use App\Enums\LeaveAccrualMode;
 use App\Enums\LeaveBalanceTransactionType;
@@ -230,6 +231,11 @@ class LeaveBalanceService
     public function adjust(LeaveBalance $balance, float $amount, string $note, User $actor): LeaveBalance
     {
         $this->applyTransaction($balance, LeaveBalanceTransactionType::Adjustment, $amount, note: $note, actor: $actor);
+
+        app(AuditLogger::class)->record(
+            AuditAction::LeaveBalanceAdjusted, $balance,
+            newData: ['amount' => $amount], reason: $note, actor: $actor,
+        );
 
         return $balance->fresh();
     }

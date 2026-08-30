@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\AuditAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Users\AssignRoleRequest;
 use App\Http\Resources\Api\V1\UserRoleResource;
 use App\Models\User;
 use App\Models\UserRole;
+use App\Services\AuditLogger;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
@@ -28,6 +30,10 @@ class UserRoleController extends Controller
         Gate::authorize('create', UserRole::class);
 
         $userRole = $user->roleAssignments()->create($request->validated());
+
+        app(AuditLogger::class)->record(
+            AuditAction::RoleAssigned, $user, newData: $request->validated(),
+        );
 
         return ApiResponse::data(new UserRoleResource($userRole->load('role')), status: 201);
     }

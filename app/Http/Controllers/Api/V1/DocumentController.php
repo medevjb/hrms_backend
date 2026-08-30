@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\AuditAction;
 use App\Enums\DocumentCategory;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Documents\UploadDocumentRequest;
 use App\Http\Resources\Api\V1\DocumentResource;
 use App\Models\Document;
 use App\Models\Employee;
+use App\Services\AuditLogger;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
@@ -59,6 +61,8 @@ class DocumentController extends Controller
     public function download(Document $document): StreamedResponse
     {
         abort_unless(Gate::allows('view', $document), 404);
+
+        app(AuditLogger::class)->record(AuditAction::DocumentDownloaded, $document);
 
         return Storage::disk('local')->download($document->file_path, $document->original_filename);
     }

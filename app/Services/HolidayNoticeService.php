@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\AnnouncementAudienceType;
 use App\Enums\AnnouncementStatus;
 use App\Enums\AnnouncementType;
+use App\Enums\AuditAction;
 use App\Enums\HolidayNoticeStatus;
 use App\Enums\HolidayReminderStatus;
 use App\Enums\PermissionName;
@@ -95,6 +96,8 @@ class HolidayNoticeService
         $announcement = $this->publishAnnouncementFor($notice, $approver);
         $notice->announcement_id = $announcement->id;
         $notice->save();
+
+        app(AuditLogger::class)->record(AuditAction::HolidayNoticeApproved, $notice, actor: $approver);
 
         return $notice->fresh(['holiday', 'announcement', 'signatory']);
     }

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AuditAction;
 use App\Enums\PayrollArrearSourceType;
 use App\Enums\PayrollArrearStatus;
 use App\Models\Employee;
@@ -66,7 +67,7 @@ class ArrearService
         $daily = $this->salaries->dailySalary($salary, $period);
         $amount = Money::round(Money::mul($daily, (string) $record->effectiveOvertimeDays()));
 
-        return PayrollArrear::query()->create([
+        $arrear = PayrollArrear::query()->create([
             'employee_id' => $record->employee_id,
             'source_type' => PayrollArrearSourceType::Overtime,
             'source_id' => $record->id,
@@ -74,6 +75,10 @@ class ArrearService
             'amount' => $amount,
             'reason' => "Overtime for {$record->work_date->toDateString()} approved after {$period->label} finalised.",
         ]);
+
+        app(AuditLogger::class)->record(AuditAction::PayrollArrearCreated, $arrear, newData: ['amount' => $amount]);
+
+        return $arrear;
     }
 
     /**
@@ -89,7 +94,7 @@ class ArrearService
     ): PayrollArrear {
         abort_unless($originalPeriod->status->isClosed(), 422, 'An arrear can only be raised against a closed period.');
 
-        return PayrollArrear::query()->create([
+        $arrear = PayrollArrear::query()->create([
             'employee_id' => $employee->id,
             'source_type' => PayrollArrearSourceType::Adjustment,
             'original_period_id' => $originalPeriod->id,
@@ -97,6 +102,13 @@ class ArrearService
             'reason' => $reason,
             'created_by_user_id' => $actor->id,
         ]);
+
+        app(AuditLogger::class)->record(
+            AuditAction::PayrollArrearCreated, $arrear,
+            newData: ['amount' => Money::round($amount)], reason: $reason, actor: $actor,
+        );
+
+        return $arrear;
     }
 
     /**
@@ -124,9 +136,15 @@ class ArrearService
 
     public function markApplied(PayrollPeriod $targetPeriod): void
     {
-        PayrollArrear::query()
+        $applied = PayrollArrear::query()
             ->where('target_period_id', $targetPeriod->id)
             ->where('status', PayrollArrearStatus::Pending)
             ->update(['status' => PayrollArrearStatus::Applied, 'applied_at' => Carbon::now()]);
+
+        if ($applied > 0) {
+            app(AuditLogger::class)->record(
+                AuditAction::PayrollArrearApplied, $targetPeriod, newData: ['arrears_applied' => $applied],
+            );
+        }
     }
 }

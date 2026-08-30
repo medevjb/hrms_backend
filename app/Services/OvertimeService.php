@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AuditAction;
 use App\Enums\EmployeeStatus;
 use App\Enums\OvertimeApprovalDecision;
 use App\Enums\OvertimeApprovalStage;
@@ -152,6 +153,8 @@ class OvertimeService
             $record->decided_at = Carbon::now();
             $record->save();
 
+            app(AuditLogger::class)->record(AuditAction::OvertimeApproved, $record, reason: $reason, actor: $approver);
+
             // §72 — if this record's work_date belongs to a period that has
             // already finalised, the money can't be paid there; it becomes
             // an arrear the next run picks up.
@@ -192,6 +195,8 @@ class OvertimeService
         $record->rejection_reason = $reason;
         $record->rejected_by_user_id = $approver->id;
         $record->save();
+
+        app(AuditLogger::class)->record(AuditAction::OvertimeApproved, $record, newData: ['decision' => 'REJECTED'], reason: $reason, actor: $approver);
 
         return $record->fresh();
     }
@@ -236,6 +241,11 @@ class OvertimeService
         }
 
         $record->save();
+
+        app(AuditLogger::class)->record(
+            AuditAction::OvertimeAdjusted, $record,
+            newData: ['manual_days_override' => (string) $days], reason: $reason, actor: $actor,
+        );
 
         if ($becameApproved) {
             app(ArrearService::class)->openOvertimeArrear($record->fresh());

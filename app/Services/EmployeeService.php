@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AuditAction;
 use App\Enums\EmployeeStatus;
 use App\Models\Employee;
 use App\Models\Shift;
@@ -63,6 +64,12 @@ class EmployeeService
         $from = $employee->status;
         $employee->update(['status' => $to]);
         $this->recordStatusChange($employee, $from, $to, $reason, $changedBy);
+
+        app(AuditLogger::class)->record(
+            AuditAction::EmployeeStatusChanged, $employee,
+            oldData: ['status' => $from->value], newData: ['status' => $to->value],
+            reason: $reason, actor: $changedBy,
+        );
 
         return $employee;
     }

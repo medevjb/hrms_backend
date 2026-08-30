@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AuditAction;
 use App\Enums\SalaryComponentType;
 use App\Enums\SalaryDayCalculationMethod;
 use App\Models\Employee;
@@ -90,6 +91,15 @@ class SalaryService
                     'amount' => Money::round($amount),
                 ]);
             }
+
+            app(AuditLogger::class)->record(
+                AuditAction::SalaryChanged,
+                $employee,
+                oldData: $current ? ['gross_monthly' => (string) $current->gross_monthly, 'effective_from' => $current->effective_from->toDateString()] : null,
+                newData: ['gross_monthly' => (string) $salary->gross_monthly, 'effective_from' => $salary->effective_from->toDateString()],
+                reason: $note,
+                actor: $actor,
+            );
 
             return $salary->load('components.component');
         });

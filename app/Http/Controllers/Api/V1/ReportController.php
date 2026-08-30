@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\AuditAction;
 use App\Enums\PermissionName;
 use App\Enums\ReportType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Reports\BuildReportRequest;
+use App\Services\AuditLogger;
 use App\Services\ReportService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -56,8 +58,14 @@ class ReportController extends Controller
     {
         abort_unless($request->user()->hasPermission(PermissionName::ReportExport), 403);
 
-        $report = $this->reports->build($this->resolveType($type), $request->filters(), $request->user());
+        $reportType = $this->resolveType($type);
+        $report = $this->reports->build($reportType, $request->filters(), $request->user());
         $filename = $report->type->value.'-'.now()->format('Y-m-d').'.csv';
+
+        app(AuditLogger::class)->record(
+            AuditAction::ReportExported, null,
+            newData: ['report' => $reportType->value, 'rows' => count($report->rows), 'filters' => $request->filters()],
+        );
 
         return response()->streamDownload(function () use ($report) {
             $handle = fopen('php://output', 'wb');

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AnnouncementController;
 use App\Http\Controllers\Api\V1\AttendanceController;
+use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Api\V1\Auth\NewPasswordController;
 use App\Http\Controllers\Api\V1\Auth\PasswordResetLinkController;
@@ -26,6 +27,7 @@ use App\Http\Controllers\Api\V1\SalaryComponentController;
 use App\Http\Controllers\Api\V1\SettingsController;
 use App\Http\Controllers\Api\V1\ShiftController;
 use App\Http\Controllers\Api\V1\ShiftOverrideController;
+use App\Http\Controllers\Api\V1\SystemHealthController;
 use App\Http\Controllers\Api\V1\TeamController;
 use App\Http\Controllers\Api\V1\UserRoleController;
 use Illuminate\Support\Facades\Route;
@@ -68,6 +70,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download');
     Route::delete('documents/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
+
+    Route::get('audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
+    Route::get('system/health', [SystemHealthController::class, 'show'])->name('system.health');
 
     Route::get('reports', [ReportController::class, 'types'])->name('reports.types');
     Route::get('reports/{type}', [ReportController::class, 'show'])->name('reports.show');

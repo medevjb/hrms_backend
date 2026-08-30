@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AuditAction;
 use App\Enums\HalfDayPeriod;
 use App\Enums\LeaveApprovalDecision;
 use App\Enums\LeaveApprovalStage;
@@ -139,6 +140,11 @@ class LeaveService
             'decided_at' => Carbon::now(),
         ]);
 
+        app(AuditLogger::class)->record(
+            AuditAction::LeaveApproved, $request,
+            newData: ['stage' => $stage->value], reason: $reason, actor: $approver,
+        );
+
         $index = array_search($stage->value, $request->required_stages, true);
         $isFinalStage = $index === count($request->required_stages) - 1;
 
@@ -182,6 +188,8 @@ class LeaveService
         $request->rejection_reason = $reason;
         $request->rejected_by_user_id = $approver->id;
         $request->save();
+
+        app(AuditLogger::class)->record(AuditAction::LeaveRejected, $request, reason: $reason, actor: $approver);
 
         return $request->fresh();
     }

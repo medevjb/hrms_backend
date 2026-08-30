@@ -17,14 +17,16 @@ class PayrollPeriodFactory extends Factory
      */
     public function definition(): array
     {
-        $month = fake()->dateTimeBetween('-6 months', 'now');
-        $start = (clone $month)->modify('first day of this month');
-        $end = (clone $month)->modify('last day of this month');
+        // A distinct month per factory instance so the unique label /
+        // (start_date, end_date) constraints don't collide across a test.
+        $monthsBack = fake()->unique()->numberBetween(1, 240);
+        $start = now()->subMonthsNoOverflow($monthsBack)->startOfMonth();
+        $end = $start->copy()->endOfMonth();
 
         return [
             'label' => $start->format('F Y'),
-            'start_date' => $start->format('Y-m-d'),
-            'end_date' => $end->format('Y-m-d'),
+            'start_date' => $start->toDateString(),
+            'end_date' => $end->toDateString(),
             'status' => PayrollPeriodStatus::Open,
             'cutoff_day_used' => null,
             'salary_day_calculation_method_used' => SalaryDayCalculationMethod::Fixed30Days,

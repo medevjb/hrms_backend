@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\AuditAction;
 use App\Enums\PayrollAdjustmentType;
 use App\Enums\PermissionName;
 use App\Http\Controllers\Controller;
@@ -11,6 +12,7 @@ use App\Http\Resources\Api\V1\PayrollDisputeResource;
 use App\Http\Resources\Api\V1\PayrollEntryResource;
 use App\Models\PayrollAdjustment;
 use App\Models\PayrollEntry;
+use App\Services\AuditLogger;
 use App\Services\PayrollService;
 use App\Services\PayrollWorkflowService;
 use App\Services\ScopeResolver;
@@ -132,6 +134,13 @@ class PayrollEntryController extends Controller
         $adjustment->update([
             'new_value' => $isEarning ? $entry->gross_earnings : $entry->total_deductions,
         ]);
+
+        app(AuditLogger::class)->record(
+            AuditAction::PayrollAdjusted, $payrollEntry,
+            oldData: ['value' => (string) $adjustment->previous_value],
+            newData: ['type' => $type->value, 'amount' => (string) $adjustment->amount, 'value' => (string) $adjustment->new_value],
+            reason: $request->validated('reason'),
+        );
 
         return ApiResponse::data(
             new PayrollEntryResource($entry->load(['employee', 'period', 'lines', 'adjustments'])),

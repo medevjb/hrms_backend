@@ -101,11 +101,11 @@ test('daily salary follows the period method', function () {
     $service = app(SalaryService::class);
 
     $fixed = PayrollPeriod::factory()->create([
-        'start_date' => '2026-08-01', 'end_date' => '2026-08-31',
+        'label' => 'August 2026', 'start_date' => '2026-08-01', 'end_date' => '2026-08-31',
         'salary_day_calculation_method_used' => SalaryDayCalculationMethod::Fixed30Days,
     ]);
     $calendar = PayrollPeriod::factory()->create([
-        'start_date' => '2026-02-01', 'end_date' => '2026-02-28',
+        'label' => 'February 2026', 'start_date' => '2026-02-01', 'end_date' => '2026-02-28',
         'salary_day_calculation_method_used' => SalaryDayCalculationMethod::CalendarDays,
     ]);
 

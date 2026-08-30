@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\AttendanceEventType;
 use App\Enums\AttendanceSource;
 use App\Enums\AttendanceStatus;
+use App\Enums\AuditAction;
 use App\Enums\EmployeeStatus;
 use App\Enums\HalfDayPeriod;
 use App\Enums\LeaveStatus;
@@ -232,6 +233,11 @@ class AttendanceService
 
         $record->is_manual_adjustment = true;
         $record->save();
+
+        app(AuditLogger::class)->record(
+            AuditAction::AttendanceUpdated, $record,
+            newData: $changes, reason: $reason, actor: $changedBy,
+        );
 
         return $record->fresh();
     }

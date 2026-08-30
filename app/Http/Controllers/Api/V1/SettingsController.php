@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\AuditAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Settings\UpdateAttendanceSettingsRequest;
 use App\Http\Requests\Api\V1\Settings\UpdateLeaveSettingsRequest;
@@ -15,6 +16,7 @@ use App\Http\Resources\Api\V1\OvertimeSettingsResource;
 use App\Http\Resources\Api\V1\PayrollSettingsResource;
 use App\Models\OrganizationSettings;
 use App\Models\PayrollSettings;
+use App\Services\AuditLogger;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
@@ -56,6 +58,8 @@ class SettingsController extends Controller
 
         $settings = OrganizationSettings::current();
         $settings->update($request->validated());
+
+        app(AuditLogger::class)->record(AuditAction::AttendanceGraceChanged, $settings, newData: $request->validated());
 
         return ApiResponse::data(new AttendanceSettingsResource($settings->fresh()));
     }
@@ -103,6 +107,8 @@ class SettingsController extends Controller
         if ($payrollValues !== []) {
             PayrollSettings::current()->fill($payrollValues)->save();
         }
+
+        app(AuditLogger::class)->record(AuditAction::PayrollSettingsChanged, $settings, newData: $validated);
 
         return ApiResponse::data(new PayrollSettingsResource($settings->fresh()));
     }
