@@ -88,7 +88,8 @@ test('filter[joined_from]/filter[joined_to] and filter[unassigned] work', functi
     $user = userWithPermission(PermissionName::EmployeeView);
     $recent = Employee::factory()->create(['joining_date' => '2026-06-15']);
     Employee::factory()->create(['joining_date' => '2023-01-10']);
-    TeamMember::factory()->create(['employee_id' => Employee::factory()->create()->id]);
+    $onATeam = Employee::factory()->create(['joining_date' => '2022-03-01']);
+    TeamMember::factory()->create(['employee_id' => $onATeam->id]);
 
     $this->actingAs($user)->getJson('/api/v1/employees?filter[joined_from]=2026-01-01')
         ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $recent->id);
