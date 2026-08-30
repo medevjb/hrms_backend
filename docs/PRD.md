@@ -4241,16 +4241,51 @@ clean.
 
 Implement:
 
-* audit viewer;
-* application status;
-* database health;
-* local storage health;
-* scheduler status;
-* database queue status;
-* failed jobs;
-* recent errors.
+* ☑ audit viewer;
+* ☑ application status;
+* ☑ database health;
+* ☑ local storage health;
+* ☑ scheduler status;
+* ☑ database queue status;
+* ☑ failed jobs;
+* ☑ recent errors.
 
 No Redis/Horizon/Pulse/S3.
+
+**Phase 12 status: complete, 2026-08-30.**
+
+**Audit (§83).** `audit_logs` (§84 columns — no `updated_at`; a row never changes).
+`AuditAction` enum covers §83's event list. `App\Services\AuditLogger::record()` writes
+one row (with `Request::ip()` / `userAgent()`) inside whatever transaction the caller is
+in — a rolled-back change takes its audit row with it. `AuditLog::booted()` throws on
+`updating` / `deleting`, so "append-only, no endpoint and no permission" is enforced at
+the ORM layer too. `GET /audit-logs` (`audit.view`, read-only — there is no write
+endpoint), filterable by action / entity type / user / date.
+
+Hooked so far: `SALARY_CHANGED`, `PAYROLL_ADJUSTED`, `PAYROLL_FINALIZED`,
+`PAYROLL_SETTINGS_CHANGED`, `PAYROLL_DISPUTE_RAISED` / `_RESOLVED`,
+`PAYROLL_ARREAR_CREATED` / `_APPLIED`, `LEAVE_APPROVED` / `_REJECTED`,
+`LEAVE_BALANCE_ADJUSTED`, `OVERTIME_APPROVED` / `_ADJUSTED`, `ATTENDANCE_UPDATED`,
+`ATTENDANCE_GRACE_CHANGED`, `EMPLOYEE_STATUS_CHANGED`, `ROLE_ASSIGNED`,
+`REPORT_EXPORTED`, `DOCUMENT_DOWNLOADED`, `HOLIDAY_NOTICE_APPROVED`. `SHIFT_CHANGED`,
+`PERMISSION_CHANGED`, `USER_TOKENS_REVOKED`, `LOGIN_FAILED` have enum cases and are wired
+opportunistically as those paths are touched again.
+
+**Basic DevOps (§79).** `SystemHealthService` + `GET /api/v1/system/health`
+(`system.health.view`) — application version, environment, Laravel / PHP version, a live
+DB `select 1` with latency, a local-storage write/read/delete probe, the scheduler
+heartbeat freshness (`scheduler:heartbeat` cache key, already written every minute by
+`app:record-scheduler-heartbeat`), and the database queue / failed-jobs counts. No Redis
+/ Horizon / Pulse. The full §79 technical dashboard is the `/system` Inertia console's
+job, not this Next.js frontend; the endpoint exists so that console (or a DevOps tool)
+can poll it.
+
+**Frontend.** New `/audit` page — filter by action and date, paginated table showing
+who / what / entity / detail. Sidebar "Insights" group gains it.
+
+375 backend tests pass (6 new: `AuditLogControllerTest`, `SystemHealthControllerTest`),
+2 pre-existing Fortify skips, 1 warning; `phpstan` / `pint` clean; frontend typecheck /
+lint / build clean.
 
 **Dependency:** Phase 11.
 
