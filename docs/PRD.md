@@ -4084,16 +4084,66 @@ templates from §84 are skipped, since no V1 workflow assembles a salary from a 
 
 Implement:
 
-* payroll runs;
-* adjustments;
-* review;
-* employee release;
-* employee acknowledgement;
-* disputes;
-* finalization;
-* payment status;
-* payslip generation;
-* period locking.
+* ☑ payroll runs;
+* ☑ adjustments;
+* ☑ review;
+* ☑ employee release;
+* ☑ employee acknowledgement;
+* ☑ disputes;
+* ☑ finalization;
+* ☑ payment status;
+* ☑ payslip generation;
+* ☑ period locking.
+
+**Phase 9 status: complete, 2026-08-30.** The full §64 state machine on top of Phase
+8's draft: `UPCOMING → OPEN → PROCESSING → REVIEW → EMPLOYEE_CONFIRMATION → FINALIZED →
+PAID → LOCKED`, driven by `PayrollWorkflowService`.
+
+**Runs.** `payroll_runs` records one audit row per draft calculation (`PayrollService::
+generate()` writes it) with the totals it produced. `GET /payroll/periods/{id}/runs`.
+
+**Review → release → confirm (§69/§70).** `review`/`release` need `payroll.prepare`;
+release stamps every entry RELEASED + acknowledgement PENDING and notifies each
+employee (`PayrollReleased`, IN_APP + EMAIL, queued). `POST /payroll/entries/{id}/
+acknowledge` and `/dispute` are the §70 "Confirm Salary" / "Report an Issue" buttons,
+self-only. Acknowledgement never changes a number (§70).
+
+**Disputes (§147).** `payroll_disputes` keeps reason / investigation note / resolution,
+all visible to the employee. A DISPUTED entry blocks that one entry's finalisation, not
+the period. `POST /payroll/disputes/{id}/resolve` (`payroll.dispute.resolve`) requires
+an explanation ("a dispute resolved without an explanation is not resolved") — UPHELD
+returns the entry to PENDING for re-acknowledgement (HR applies the §68 adjustment
+separately), REJECTED closes it. `PayrollWorkflowService::deferDisputedEntry()` exists
+for the §147 "defer to next period as an arrear" escape hatch. The §147 dispute window
+(default 7 days, `payroll_settings.dispute_window_days`) auto-acknowledges stale PENDING
+entries at finalisation so one unresponsive employee can't stall payroll.
+
+**Finalise (§69/§71/§72).** `finalize` (`payroll.finalize`, a §92.5 mandatory-2FA
+permission): auto-acknowledge the window, refuse if any dispute is still open, then per
+entry render the §71 payslip PDF (`barryvdh/laravel-dompdf`,
+`resources/views/pdf/payslip.blade.php`) into `storage/app/private/payslips/` with a
+`payslips` row (totals snapshotted), mark the entry FINALIZED, mark the period's
+Approved overtime records PAYROLL_PROCESSED, and mark claimed arrears APPLIED. `GET
+/payroll/entries/{id}/payslip` streams the PDF. `mark-paid` → PAID, `lock` → LOCKED.
+
+**Arrears (§72/§146).** `payroll_arrears` (signed amount — negative is a recovery).
+`OvertimeService::approve()` / `adjust()` now call `ArrearService::openOvertimeArrear()`:
+if the record's `work_date` is in a FINALIZED/PAID/LOCKED period, the money can't be paid
+there, so a PENDING arrear is filed valued at that period's daily salary. The next
+period's `PayrollService::calculate()` claims every unclaimed PENDING arrear for the
+employee, renders it as its own line labelled with the original period ("Arrear (August
+2026)"), and finalisation marks it APPLIED. `POST /payroll/periods/{id}/arrears`
+(`payroll.adjust`) files a manual arrear — a negative one is the §146 recovery path.
+
+**Frontend.** Period detail page gains a status-aware action bar (review → release →
+finalise → mark paid → lock). The entry breakdown dialog gains Confirm salary / Report
+an issue for the owning employee and a payslip download once finalised; a Disputes tab
+lists open disputes with a resolve dialog for `payroll.dispute.resolve` holders. My
+payslips tab carries the same acknowledge / dispute / download.
+
+355 backend tests pass (15 new: `PayrollWorkflowTest`, `ArrearTest`,
+`PayrollWorkflowControllerTest`), 2 pre-existing Fortify skips; `phpstan` / `pint`
+clean; frontend typecheck / lint / build clean.
 
 **Dependency:** Phase 8.
 
