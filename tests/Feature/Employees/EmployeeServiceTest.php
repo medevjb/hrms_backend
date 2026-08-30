@@ -4,8 +4,8 @@ use App\Enums\EmployeeStatus;
 use App\Models\Employee;
 use App\Models\Team;
 use App\Models\User;
+use App\Notifications\EmployeeInvitationNotification;
 use App\Services\EmployeeService;
-use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 
@@ -27,7 +27,7 @@ test('inviting creates a paired user nobody can log in as yet, and an INVITED em
     expect($employee->user->email)->toBe('newhire@example.com');
     expect(Hash::check('password', $employee->user->password))->toBeFalse();
 
-    Notification::assertSentTo($employee->user, ResetPassword::class);
+    Notification::assertSentTo($employee->user, EmployeeInvitationNotification::class);
 });
 
 test('inviting records the initial status history entry', function () {
@@ -56,9 +56,10 @@ test('the invitation url points at the frontend reset-password page', function (
         'joining_date' => '2026-09-01', 'designation' => 'X', 'employment_type' => 'FULL_TIME',
     ], $admin);
 
-    Notification::assertSentTo($employee->user, function (ResetPassword $notification) use ($employee) {
+    Notification::assertSentTo($employee->user, function (EmployeeInvitationNotification $notification) use ($employee) {
         $url = $notification->toMail($employee->user)->actionUrl;
-        expect($url)->toStartWith('http://localhost:3000/reset-password?token=');
+        expect($url)->toStartWith('http://localhost:3000/reset-password?token=')
+            ->and($url)->toContain('&email='.urlencode($employee->user->email));
 
         return true;
     });

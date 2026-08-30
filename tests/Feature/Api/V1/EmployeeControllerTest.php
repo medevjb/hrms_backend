@@ -15,6 +15,7 @@ use App\Models\Team;
 use App\Models\TeamMember;
 use App\Models\User;
 use App\Models\UserRole;
+use App\Notifications\EmployeeInvitationNotification;
 use Illuminate\Support\Facades\Notification;
 
 function userWithPermission(PermissionName $permission, Scope $scope = Scope::AllEmployees, ?int $scopeId = null): User
@@ -121,6 +122,9 @@ test('creating an employee invites them and returns 201', function () {
     $response->assertStatus(201);
     $response->assertJsonPath('data.status', 'INVITED');
     $response->assertJsonPath('data.email', 'newperson@example.com');
+
+    $invited = User::query()->where('email', 'newperson@example.com')->sole();
+    Notification::assertSentTo($invited, EmployeeInvitationNotification::class);
 });
 
 test('creating an employee with a duplicate email is rejected', function () {

@@ -8,6 +8,8 @@ use App\Models\Employee;
 use App\Models\Shift;
 use App\Models\Team;
 use App\Models\User;
+use App\Notifications\EmployeeInvitationNotification;
+use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -51,7 +53,9 @@ class EmployeeService
 
         $this->recordStatusChange($employee, null, EmployeeStatus::Invited, 'Employee created', $invitedBy);
 
-        Password::broker('employee_invitations')->sendResetLink($user->only('email'));
+        /** @var PasswordBroker $broker */
+        $broker = Password::broker('employee_invitations');
+        $user->notify(new EmployeeInvitationNotification($broker->createToken($user)));
 
         return $employee;
     }
