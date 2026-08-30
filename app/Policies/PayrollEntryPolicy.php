@@ -42,4 +42,18 @@ class PayrollEntryPolicy
     {
         return $user->hasPermission(PermissionName::PayrollAdjust);
     }
+
+    /**
+     * §70 — confirming or disputing a payslip is the employee's own act,
+     * on their own entry.
+     */
+    public function respond(User $user, PayrollEntry $entry): bool
+    {
+        return $entry->employee_id === $user->employee?->id;
+    }
+
+    public function viewPayslip(User $user, PayrollEntry $entry): bool
+    {
+        return $this->view($user, $entry);
+    }
 }

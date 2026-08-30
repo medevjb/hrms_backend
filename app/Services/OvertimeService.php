@@ -152,6 +152,11 @@ class OvertimeService
             $record->decided_at = Carbon::now();
             $record->save();
 
+            // §72 — if this record's work_date belongs to a period that has
+            // already finalised, the money can't be paid there; it becomes
+            // an arrear the next run picks up.
+            app(ArrearService::class)->openOvertimeArrear($record->fresh());
+
             return $record->fresh();
         }
 
@@ -220,7 +225,9 @@ class OvertimeService
             'adjusted_at' => Carbon::now(),
         ]);
 
-        if ($days > 0 && $record->status === OvertimeStatus::Rejected) {
+        $becameApproved = $days > 0 && $record->status === OvertimeStatus::Rejected;
+
+        if ($becameApproved) {
             $record->status = OvertimeStatus::Approved;
             $record->current_stage = null;
             $record->decided_at = Carbon::now();
@@ -229,6 +236,10 @@ class OvertimeService
         }
 
         $record->save();
+
+        if ($becameApproved) {
+            app(ArrearService::class)->openOvertimeArrear($record->fresh());
+        }
 
         return $record->fresh();
     }

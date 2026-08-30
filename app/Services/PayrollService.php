@@ -17,8 +17,10 @@ use App\Models\LatePenaltyRule;
 use App\Models\LeaveRequest;
 use App\Models\OrganizationSettings;
 use App\Models\PayrollAdjustment;
+use App\Models\PayrollArrear;
 use App\Models\PayrollEntry;
 use App\Models\PayrollPeriod;
+use App\Models\PayrollRun;
 use App\Models\PayrollSettings;
 use App\Models\User;
 use App\Support\Money;
@@ -44,6 +46,7 @@ class PayrollService
     public function __construct(
         private readonly SalaryService $salaries,
         private readonly OvertimeService $overtime,
+        private readonly ArrearService $arrears,
     ) {}
 
     /**
@@ -113,9 +116,30 @@ class PayrollService
             }
 
             $period->update(['status' => PayrollPeriodStatus::Processing, 'processed_at' => Carbon::now()]);
+
+            $this->recordRun($period);
         });
 
         return ['entries' => $period->entries()->count()];
+    }
+
+    /**
+     * §69 — an audit row per draft calculation of a period, with the
+     * totals it produced.
+     */
+    private function recordRun(PayrollPeriod $period): void
+    {
+        $entries = $period->entries()->get();
+
+        PayrollRun::query()->create([
+            'payroll_period_id' => $period->id,
+            'sequence' => ($period->payrollRuns()->max('sequence') ?? 0) + 1,
+            'entry_count' => $entries->count(),
+            'gross_total' => Money::round(Money::sum($entries->pluck('gross_earnings'))),
+            'deduction_total' => Money::round(Money::sum($entries->pluck('total_deductions'))),
+            'net_total' => Money::round(Money::sum($entries->pluck('net_salary'))),
+            'triggered_by_user_id' => auth()->id(),
+        ]);
     }
 
     /**
@@ -241,6 +265,30 @@ class PayrollService
                     $earnings[] = $line->amount;
                 } else {
                     $deductions[] = $line->amount;
+                }
+            }
+
+            // §146 — arrears claimed from closed periods. A positive arrear
+            // is an earning line; a negative one is a recovery deduction.
+            foreach ($this->arrears->claimFor($entry->employee, $entry->period) as $arrear) {
+                $isRecovery = Money::isNegative($arrear->amount);
+                $lineType = $isRecovery ? PayrollLineType::ArrearRecovery : PayrollLineType::Arrear;
+                $absolute = $isRecovery ? Money::mul($arrear->amount, '-1') : (string) $arrear->amount;
+
+                $line = $entry->lines()->create([
+                    'category' => $lineType->category(),
+                    'type' => $lineType,
+                    'label' => "Arrear ({$arrear->originalPeriod->label})",
+                    'amount' => Money::round($absolute),
+                    'computed_from' => ['reason' => $arrear->reason, 'source' => $arrear->source_type->value],
+                    'source_type' => PayrollArrear::class,
+                    'source_id' => $arrear->id,
+                ]);
+
+                if ($isRecovery) {
+                    $deductions[] = $line->amount;
+                } else {
+                    $earnings[] = $line->amount;
                 }
             }
 

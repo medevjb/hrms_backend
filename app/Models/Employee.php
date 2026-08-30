@@ -200,4 +200,12 @@ class Employee extends Model
     {
         return $this->hasMany(PayrollEntry::class);
     }
+
+    /**
+     * @return HasMany<PayrollArrear, $this>
+     */
+    public function payrollArrears(): HasMany
+    {
+        return $this->hasMany(PayrollArrear::class);
+    }
 }

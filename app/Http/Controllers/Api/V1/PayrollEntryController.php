@@ -6,16 +6,21 @@ use App\Enums\PayrollAdjustmentType;
 use App\Enums\PermissionName;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Payroll\AdjustPayrollEntryRequest;
+use App\Http\Requests\Api\V1\Payroll\RaiseDisputeRequest;
+use App\Http\Resources\Api\V1\PayrollDisputeResource;
 use App\Http\Resources\Api\V1\PayrollEntryResource;
 use App\Models\PayrollAdjustment;
 use App\Models\PayrollEntry;
 use App\Services\PayrollService;
+use App\Services\PayrollWorkflowService;
 use App\Services\ScopeResolver;
 use App\Support\ApiResponse;
 use App\Support\Money;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * docs/PRD.md §66/§68/§70 — payroll entry list / detail and the §68 manual
@@ -26,6 +31,7 @@ class PayrollEntryController extends Controller
 {
     public function __construct(
         private readonly PayrollService $payroll,
+        private readonly PayrollWorkflowService $workflow,
         private readonly ScopeResolver $scopeResolver,
     ) {}
 
@@ -70,9 +76,37 @@ class PayrollEntryController extends Controller
     {
         abort_unless(Gate::allows('view', $payrollEntry), 404);
 
-        $payrollEntry->load(['employee', 'period', 'lines', 'adjustments']);
+        $payrollEntry->load(['employee', 'period', 'lines', 'adjustments', 'disputes', 'payslip']);
 
         return ApiResponse::data(new PayrollEntryResource($payrollEntry));
+    }
+
+    public function acknowledge(Request $request, PayrollEntry $payrollEntry): JsonResponse
+    {
+        abort_unless(Gate::allows('respond', $payrollEntry), 404);
+
+        $entry = $this->workflow->acknowledge($payrollEntry, $request->user());
+
+        return ApiResponse::data(new PayrollEntryResource($entry->load(['employee', 'period'])));
+    }
+
+    public function dispute(RaiseDisputeRequest $request, PayrollEntry $payrollEntry): JsonResponse
+    {
+        abort_unless(Gate::allows('respond', $payrollEntry), 404);
+
+        $dispute = $this->workflow->raiseDispute($payrollEntry, $request->user(), $request->validated('reason'));
+
+        return ApiResponse::data(new PayrollDisputeResource($dispute), status: 201);
+    }
+
+    public function payslip(PayrollEntry $payrollEntry): StreamedResponse
+    {
+        abort_unless(Gate::allows('viewPayslip', $payrollEntry), 404);
+
+        $payslip = $payrollEntry->payslip;
+        abort_if($payslip === null, 404, 'No payslip has been generated for this entry yet.');
+
+        return Storage::disk('local')->download($payslip->file_path, "{$payslip->reference}.pdf");
     }
 
     public function adjust(AdjustPayrollEntryRequest $request, PayrollEntry $payrollEntry): JsonResponse

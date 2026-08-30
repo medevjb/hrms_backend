@@ -31,4 +31,24 @@ class PayrollPeriodPolicy
     {
         return $user->hasPermission(PermissionName::PayrollPrepare);
     }
+
+    /**
+     * §69 — moving a period to review and releasing it to employees is
+     * preparation work; finalising, marking paid, and locking need
+     * `payroll.finalize` (a §92.5 mandatory-2FA permission).
+     */
+    public function advance(User $user, PayrollPeriod $period): bool
+    {
+        return $user->hasPermission(PermissionName::PayrollPrepare);
+    }
+
+    public function finalize(User $user, PayrollPeriod $period): bool
+    {
+        return $user->hasPermission(PermissionName::PayrollFinalize);
+    }
+
+    public function createArrear(User $user, PayrollPeriod $period): bool
+    {
+        return $user->hasPermission(PermissionName::PayrollAdjust);
+    }
 }

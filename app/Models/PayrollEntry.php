@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\PayrollAcknowledgementStatus;
+use App\Enums\PayrollDisputeStatus;
 use App\Enums\PayrollEntryStatus;
 use Database\Factories\PayrollEntryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -9,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -21,6 +24,10 @@ use Illuminate\Support\Carbon;
  * @property int $employee_id
  * @property int|null $employee_salary_id
  * @property PayrollEntryStatus $status
+ * @property PayrollAcknowledgementStatus $acknowledgement_status
+ * @property Carbon|null $released_at
+ * @property Carbon|null $acknowledged_at
+ * @property Carbon|null $finalized_at
  * @property string $basic_salary
  * @property string $daily_salary
  * @property int $period_days
@@ -34,22 +41,29 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $calculated_at
  */
 #[Fillable([
-    'payroll_period_id', 'employee_id', 'employee_salary_id', 'status',
+    'payroll_period_id', 'employee_id', 'employee_salary_id', 'status', 'acknowledgement_status',
     'basic_salary', 'daily_salary', 'period_days', 'late_days', 'absent_days',
     'unpaid_leave_days', 'overtime_days', 'gross_earnings', 'total_deductions',
-    'net_salary', 'calculated_at',
+    'net_salary', 'calculated_at', 'released_at', 'acknowledged_at', 'finalized_at',
 ])]
 class PayrollEntry extends Model
 {
     /** @use HasFactory<PayrollEntryFactory> */
     use HasFactory;
 
-    protected $attributes = ['status' => PayrollEntryStatus::Draft->value];
+    protected $attributes = [
+        'status' => PayrollEntryStatus::Draft->value,
+        'acknowledgement_status' => PayrollAcknowledgementStatus::Pending->value,
+    ];
 
     protected function casts(): array
     {
         return [
             'status' => PayrollEntryStatus::class,
+            'acknowledgement_status' => PayrollAcknowledgementStatus::class,
+            'released_at' => 'datetime',
+            'acknowledged_at' => 'datetime',
+            'finalized_at' => 'datetime',
             'basic_salary' => 'decimal:4',
             'daily_salary' => 'decimal:4',
             'period_days' => 'integer',
@@ -94,5 +108,26 @@ class PayrollEntry extends Model
     public function adjustments(): HasMany
     {
         return $this->hasMany(PayrollAdjustment::class);
+    }
+
+    /**
+     * @return HasMany<PayrollDispute, $this>
+     */
+    public function disputes(): HasMany
+    {
+        return $this->hasMany(PayrollDispute::class);
+    }
+
+    /**
+     * @return HasOne<Payslip, $this>
+     */
+    public function payslip(): HasOne
+    {
+        return $this->hasOne(Payslip::class);
+    }
+
+    public function hasOpenDispute(): bool
+    {
+        return $this->disputes()->where('status', PayrollDisputeStatus::Open)->exists();
     }
 }

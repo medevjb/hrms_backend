@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\LeaveBalanceController;
 use App\Http\Controllers\Api\V1\LeaveRequestController;
 use App\Http\Controllers\Api\V1\LeaveTypeController;
 use App\Http\Controllers\Api\V1\OvertimeController;
+use App\Http\Controllers\Api\V1\PayrollDisputeController;
 use App\Http\Controllers\Api\V1\PayrollEntryController;
 use App\Http\Controllers\Api\V1\PayrollPeriodController;
 use App\Http\Controllers\Api\V1\SalaryComponentController;
@@ -143,10 +144,25 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('periods/{payrollPeriod}', [PayrollPeriodController::class, 'show'])->name('periods.show');
         Route::post('periods/{payrollPeriod}/generate', [PayrollPeriodController::class, 'generate'])
             ->name('periods.generate');
+        Route::post('periods/{payrollPeriod}/review', [PayrollPeriodController::class, 'review'])->name('periods.review');
+        Route::post('periods/{payrollPeriod}/release', [PayrollPeriodController::class, 'release'])->name('periods.release');
+        Route::post('periods/{payrollPeriod}/finalize', [PayrollPeriodController::class, 'finalize'])->name('periods.finalize');
+        Route::post('periods/{payrollPeriod}/mark-paid', [PayrollPeriodController::class, 'markPaid'])->name('periods.mark-paid');
+        Route::post('periods/{payrollPeriod}/lock', [PayrollPeriodController::class, 'lock'])->name('periods.lock');
+        Route::get('periods/{payrollPeriod}/runs', [PayrollPeriodController::class, 'runs'])->name('periods.runs');
+        Route::get('periods/{payrollPeriod}/arrears', [PayrollPeriodController::class, 'arrears'])->name('periods.arrears');
+        Route::post('periods/{payrollPeriod}/arrears', [PayrollPeriodController::class, 'storeArrear'])->name('periods.arrears.store');
 
         Route::get('entries', [PayrollEntryController::class, 'index'])->name('entries.index');
         Route::get('entries/{payrollEntry}', [PayrollEntryController::class, 'show'])->name('entries.show');
         Route::post('entries/{payrollEntry}/adjust', [PayrollEntryController::class, 'adjust'])->name('entries.adjust');
+        Route::post('entries/{payrollEntry}/acknowledge', [PayrollEntryController::class, 'acknowledge'])->name('entries.acknowledge');
+        Route::post('entries/{payrollEntry}/dispute', [PayrollEntryController::class, 'dispute'])->name('entries.dispute');
+        Route::get('entries/{payrollEntry}/payslip', [PayrollEntryController::class, 'payslip'])->name('entries.payslip');
+
+        Route::get('disputes', [PayrollDisputeController::class, 'index'])->name('disputes.index');
+        Route::get('disputes/open', [PayrollDisputeController::class, 'open'])->name('disputes.open');
+        Route::post('disputes/{payrollDispute}/resolve', [PayrollDisputeController::class, 'resolve'])->name('disputes.resolve');
     });
 
     Route::prefix('settings')->name('settings.')->group(function () {

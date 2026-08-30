@@ -18,6 +18,11 @@ class PayrollEntryResource extends JsonResource
             'id' => $this->id,
             'payroll_period_id' => $this->payroll_period_id,
             'status' => $this->status->value,
+            'acknowledgement_status' => $this->acknowledgement_status->value,
+            'released_at' => $this->released_at?->toIso8601String(),
+            'acknowledged_at' => $this->acknowledged_at?->toIso8601String(),
+            'finalized_at' => $this->finalized_at?->toIso8601String(),
+            'has_payslip' => $this->relationLoaded('payslip') ? $this->payslip !== null : null,
             'employee' => [
                 'id' => $this->employee->id,
                 'full_name' => $this->employee->fullName(),
@@ -57,6 +62,15 @@ class PayrollEntryResource extends JsonResource
                 'amount' => (string) $adjustment->amount,
                 'reason' => $adjustment->reason,
                 'created_at' => $adjustment->created_at?->toIso8601String(),
+            ])->values()),
+            'disputes' => $this->whenLoaded('disputes', fn () => $this->disputes->map(fn ($dispute) => [
+                'id' => $dispute->id,
+                'status' => $dispute->status->value,
+                'reason' => $dispute->reason,
+                'resolution' => $dispute->resolution?->value,
+                'resolution_note' => $dispute->resolution_note,
+                'resolved_at' => $dispute->resolved_at?->toIso8601String(),
+                'created_at' => $dispute->created_at?->toIso8601String(),
             ])->values()),
         ];
     }

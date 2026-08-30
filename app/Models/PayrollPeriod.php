@@ -57,4 +57,12 @@ class PayrollPeriod extends Model
     {
         return $this->hasMany(PayrollEntry::class);
     }
+
+    /**
+     * @return HasMany<PayrollRun, $this>
+     */
+    public function payrollRuns(): HasMany
+    {
+        return $this->hasMany(PayrollRun::class);
+    }
 }
