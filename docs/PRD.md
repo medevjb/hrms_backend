@@ -3902,15 +3902,73 @@ date-cursor loop).
 
 Implement:
 
-* holiday calendar;
-* five-day reminder;
-* Head HR approval;
-* notice generation;
-* signature;
-* announcements;
-* SMTP notifications.
+* ☑ holiday calendar;
+* ☑ five-day reminder;
+* ☑ Head HR approval;
+* ☑ notice generation;
+* ☑ signature;
+* ☑ announcements;
+* ☑ SMTP notifications.
 
 Use Laravel Scheduler.
+
+**Phase 7 status: complete, 2026-08-30.** The holiday calendar itself already
+shipped in Phase 3 (`holidays` table, §54 CRUD). This phase built the §55/§56
+notice pipeline and the §57 announcement module on top.
+
+Backend. `holiday_reminders` (unique `holiday_id` — the dedupe guard §84's mismatch
+table calls for) and `holiday_notices` (the §56 document: `reference`, `message`,
+`closure_note`, `return_date`, `signatory_name`/`signatory_user_id`, `generated_at`,
+`file_path`, `announcement_id`). `HolidayNoticeService::scanForUpcomingHolidays()`
+runs from `holidays:scan-notices` (Scheduler, daily 06:00): any active holiday exactly
+five days out with no reminder gets a reminder **and** a `PENDING_APPROVAL` notice
+draft (message auto-composed from `OrganizationSettings`, return date = holiday + 1
+day), then Head HR (`holiday.notice.approve` holders) is notified `IN_APP` + `EMAIL`.
+Idempotent across the five in-window days via the unique `holiday_id`. `approve()`
+(`POST /holiday-notices/{id}/approve`, gated `holiday.notice.approve`) applies Head
+HR's edits, renders the §56 PDF via `barryvdh/laravel-dompdf` (**new dependency**,
+§284 — `resources/views/pdf/holiday-notice.blade.php`) into `storage/app/private/
+holiday-notices/`, stamps the signature, flips the notice to `PUBLISHED`, actions the
+reminder, and creates + publishes a `HOLIDAY` announcement — which is what actually
+emails every employee (§80). `dismiss()` closes a reminder Head HR waves off.
+`GET /holiday-notices/{id}/download` streams the private PDF (§82); the Next.js proxy
+route was taught to pass non-JSON bodies through as binary rather than decode them as
+text (payslip PDFs in Phase 9 need the same).
+
+`announcements` / `announcement_targets` / `announcement_reads`. `AnnouncementType`
+(§57's seven), `AnnouncementAudienceType` (ALL / DEPARTMENT / TEAM / ROLE / SELECTED),
+`AnnouncementStatus` (DRAFT / PUBLISHED / EXPIRED). `AnnouncementService::publish()`
+resolves the audience to a concrete active-employee set and sends one
+`AnnouncementPublished` each — `IN_APP` always, `+ EMAIL` for the types an employee
+"cannot afford to miss" (HOLIDAY, PAYROLL, EMERGENCY, POLICY, HR_NOTICE) or any post
+flagged for acknowledgement; the notification is `ShouldQueue` since an ALL send is a
+bulk job (§81). EMERGENCY / POLICY default `acknowledgement_required` on;
+`announcement_reads.acknowledged` distinguishes an explicit "I acknowledge" from an
+incidental open. `announcements:publish-due` (Scheduler, hourly) releases drafts whose
+`publish_at` has arrived and expires ones past `expires_at`. `GET /announcements` is
+audience-scoped: `announcement.create`/`.publish` holders see everything including
+drafts, everyone else sees only published posts aimed at a group they belong to.
+`ROLE` audience works server-side but the create dialog only exposes ALL / DEPARTMENT
+/ TEAM / SELECTED for V1.
+
+`MAIL_MAILER` stays `log` in dev / `array` in tests (§80 SMTP is a deployment-time
+config, like §101's other credentials); the mail *content* — `toMail()` on both
+notifications — is built and asserted.
+
+Frontend. Holidays page gains a "Notices" tab (`HolidayNoticesList` +
+`ApproveHolidayNoticeDialog` — review, edit, sign, or dismiss; download PDF once
+published). New `/announcements` page: a "For me" feed (unread dot, inline
+acknowledge) for everyone, plus a "Manage" tab and "New announcement" dialog for
+`announcement.create`/`.publish`. Sidebar gains a "Communication" group.
+
+311 backend tests pass (31 new: `HolidayNoticeServiceTest`,
+`HolidayNoticeControllerTest`, `AnnouncementServiceTest`,
+`AnnouncementControllerTest`, `HolidayAndAnnouncementSchedulerTest`), 2 pre-existing
+Fortify skips; `phpstan` / `pint` clean; frontend typecheck / lint / build clean.
+
+Trap of note: `announcements` and `holiday_notices` reference each other, so the FK on
+`announcements.holiday_notice_id` was dropped (plain column, no constraint) to break
+the migration cycle — the authoritative link is `holiday_notices.announcement_id`.
 
 **Dependency:** Phase 6.
 
