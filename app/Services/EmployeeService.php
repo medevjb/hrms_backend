@@ -103,6 +103,9 @@ class EmployeeService
                 actor: $actor,
             );
 
+            // The only history an un-onboarded invite has is the "created"
+            // status row written by invite() itself — it goes with them.
+            $employee->statusHistory()->delete();
             $employee->delete();
 
             if ($user !== null) {

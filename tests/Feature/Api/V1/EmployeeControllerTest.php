@@ -8,6 +8,7 @@ use App\Models\AttendanceRecord;
 use App\Models\AuditLog;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\EmployeeStatusHistory;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Team;
@@ -180,6 +181,12 @@ test('deleting an employee without employee.archive is 404', function () {
 test('an invited employee with no history can be deleted along with their user', function () {
     $employee = Employee::factory()->invited()->create();
     $userId = $employee->user_id;
+    // Every real invite writes one "created" status row — deleting the
+    // employee has to take it with them, not trip the FK constraint.
+    EmployeeStatusHistory::factory()->create([
+        'employee_id' => $employee->id,
+        'to_status' => EmployeeStatus::Invited,
+    ]);
     $user = userWithPermission(PermissionName::EmployeeArchive);
 
     $this->actingAs($user)
@@ -188,6 +195,7 @@ test('an invited employee with no history can be deleted along with their user',
 
     expect(Employee::query()->find($employee->id))->toBeNull()
         ->and(User::query()->find($userId))->toBeNull()
+        ->and(EmployeeStatusHistory::query()->where('employee_id', $employee->id)->exists())->toBeFalse()
         ->and(AuditLog::query()->where('action', AuditAction::EmployeeDeleted)->exists())->toBeTrue();
 });
 
