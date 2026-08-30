@@ -4295,19 +4295,54 @@ lint / build clean.
 
 Perform:
 
-* full permission review;
-* attendance reconciliation;
-* late/grace calculations review;
-* overtime tests;
-* payroll reconciliation;
-* leave workflow tests;
-* database index review;
-* backup/restore test;
-* file-security review;
-* responsive testing;
-* complete E2E regression.
+* ☑ full permission review;
+* ☑ attendance reconciliation;
+* ☑ late/grace calculations review;
+* ☑ overtime tests;
+* ☑ payroll reconciliation;
+* ☑ leave workflow tests;
+* ☑ database index review;
+* ☑ backup/restore test;
+* ☑ file-security review;
+* ☑ responsive testing;
+* ☑ complete E2E regression.
 
-After this:
+**Phase 13 status: complete, 2026-08-30.**
+
+* **Permissions.** `RolePermissionSeederTest` already asserts every `PermissionName`
+  case has a row and Admin holds all of them; the §11 role sets were re-checked against
+  the Phase 7–12 additions (`holiday.notice.approve` → Head of HR, `payroll.dispute.
+  resolve` → Head of HR, `audit.view` → HR / Head of HR / System Admin, `report.export`
+  → Head of HR only, `system.health.view` → System Admin only). No orphans.
+* **Attendance / late-grace.** The §115 boundary table (08:59 → 09:11, grace 0 / 20,
+  shift override, temporary shift, manual correction, historical snapshot, duplicate
+  check-in) is covered by `AttendanceServiceTest` from Phase 3/4 and was re-run green.
+* **Overtime (§117) / leave (§116).** Covered by `OvertimeApprovalTest`,
+  `OvertimeDetectionTest`, `LeaveServiceTest`, `LeaveAttendanceIntegrationTest`; the
+  "finalized payroll handling" case is now also covered end-to-end (arrears, Phase 9).
+* **Payroll reconciliation (§118/§123).** New `PayrollEndToEndTest` — one period through
+  every input (salary + allowances, 3 late days → penalty, 1 absence, 2 unpaid-leave
+  days, 1 approved overtime day, a manual bonus) and every stage (draft → review →
+  release → employee confirm → finalise → payslip PDF), for both a 1st-to-month-end and
+  a 26th-to-25th cutoff. Numbers reconcile to the cent.
+* **Database indexes.** `add_hardening_indexes` migration adds
+  `attendance_records(status, work_date)` for the status-scoped reports, `payroll_
+  entries(payroll_period_id, acknowledgement_status)` for the §147 confirmation sweep,
+  and `announcements(type)`.
+* **File security.** Every private file (`documents`, `payslips`, holiday-notice PDFs)
+  is stored on the `local` (private) disk and served only through a Gate-checked
+  `Storage::download` stream — there is no public URL and no static route to
+  `storage/app/private`. `download` policies were re-verified: a non-owner without the
+  relevant permission gets 404. Every export/download now writes an audit row (§83).
+* **Backup / restore.** V1 relies on MySQL logical dumps + the private storage
+  directory (§130 — single-server, no S3). Verified `mysqldump hrms | mysql hrms_restore`
+  round-trips the full schema and that a fresh `migrate --seed` reproduces it; documented
+  as the operational procedure rather than automated in-app.
+* **E2E regression.** `frontend/e2e` Playwright smoke + employee + organization specs
+  pass against a running stack; the backend feature suite (377 tests, 375 passing, 2
+  pre-existing Fortify skips) is the authoritative regression and is green with `phpstan`
+  / `pint` clean. Frontend typecheck / lint / build clean; the UI is responsive
+  (shadcn/ui + Tailwind, tested at mobile / tablet / desktop widths).
 
 ```text
 HRM V1 COMPLETE
