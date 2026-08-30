@@ -31,4 +31,9 @@ class DepartmentPolicy
     {
         return $user->hasPermission(PermissionName::DepartmentManage);
     }
+
+    public function delete(User $user): bool
+    {
+        return $user->hasPermission(PermissionName::DepartmentManage);
+    }
 }

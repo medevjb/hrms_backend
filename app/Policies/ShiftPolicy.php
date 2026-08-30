@@ -27,6 +27,11 @@ class ShiftPolicy
         return $user->hasPermission(PermissionName::ShiftManage);
     }
 
+    public function delete(User $user): bool
+    {
+        return $user->hasPermission(PermissionName::ShiftManage);
+    }
+
     /**
      * docs/PRD.md §23 — a temporary shift change for one day is a distinct
      * privilege from managing the shift catalogue itself.

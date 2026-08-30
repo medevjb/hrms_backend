@@ -15,6 +15,7 @@ use App\Services\AnnouncementService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
@@ -143,6 +144,16 @@ class AnnouncementController extends Controller
         return response()->json([
             'data' => new AnnouncementResource($announcement->fresh(['creator', 'targets'])),
         ]);
+    }
+
+    public function destroy(Announcement $announcement): Response
+    {
+        abort_unless(Gate::allows('delete', $announcement), 403);
+
+        $announcement->targets()->delete();
+        $announcement->delete();
+
+        return response()->noContent();
     }
 
     public function publish(Request $request, Announcement $announcement): JsonResponse

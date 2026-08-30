@@ -31,4 +31,9 @@ class TeamPolicy
     {
         return $user->hasPermission(PermissionName::TeamManage);
     }
+
+    public function delete(User $user): bool
+    {
+        return $user->hasPermission(PermissionName::TeamManage);
+    }
 }

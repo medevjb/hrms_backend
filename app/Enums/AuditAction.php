@@ -22,6 +22,7 @@ enum AuditAction: string
     case PayrollFinalized = 'PAYROLL_FINALIZED';
     case PayrollSettingsChanged = 'PAYROLL_SETTINGS_CHANGED';
     case EmployeeStatusChanged = 'EMPLOYEE_STATUS_CHANGED';
+    case EmployeeDeleted = 'EMPLOYEE_DELETED';
     case LeaveBalanceAdjusted = 'LEAVE_BALANCE_ADJUSTED';
     case PayrollDisputeRaised = 'PAYROLL_DISPUTE_RAISED';
     case PayrollDisputeResolved = 'PAYROLL_DISPUTE_RESOLVED';

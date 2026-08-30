@@ -8,6 +8,7 @@ use App\Http\Resources\Api\V1\DepartmentResource;
 use App\Models\Department;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 
 class DepartmentController extends Controller
@@ -44,5 +45,19 @@ class DepartmentController extends Controller
         $department->update($request->validated());
 
         return ApiResponse::data(new DepartmentResource($department->fresh('operationManager')));
+    }
+
+    public function destroy(Department $department): Response
+    {
+        abort_unless(Gate::allows('delete', $department), 403);
+        abort_if(
+            $department->teams()->exists(),
+            409,
+            'This department still has teams. Move or delete them first.',
+        );
+
+        $department->delete();
+
+        return response()->noContent();
     }
 }

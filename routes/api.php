@@ -57,6 +57,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('employees', [EmployeeController::class, 'store'])->name('employees.store');
     Route::get('employees/{employee}', [EmployeeController::class, 'show'])->name('employees.show');
     Route::put('employees/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
+    Route::delete('employees/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
     Route::patch('employees/{employee}/status', [EmployeeController::class, 'updateStatus'])
         ->name('employees.update-status');
     Route::post('employees/{employee}/transfer', [EmployeeController::class, 'transfer'])
@@ -82,11 +83,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('departments', [DepartmentController::class, 'store'])->name('departments.store');
     Route::get('departments/{department}', [DepartmentController::class, 'show'])->name('departments.show');
     Route::put('departments/{department}', [DepartmentController::class, 'update'])->name('departments.update');
+    Route::delete('departments/{department}', [DepartmentController::class, 'destroy'])->name('departments.destroy');
 
     Route::get('teams', [TeamController::class, 'index'])->name('teams.index');
     Route::post('teams', [TeamController::class, 'store'])->name('teams.store');
     Route::get('teams/{team}', [TeamController::class, 'show'])->name('teams.show');
     Route::put('teams/{team}', [TeamController::class, 'update'])->name('teams.update');
+    Route::delete('teams/{team}', [TeamController::class, 'destroy'])->name('teams.destroy');
     Route::get('teams/{team}/members', [TeamController::class, 'members'])->name('teams.members.index');
     Route::post('teams/{team}/members', [TeamController::class, 'addMember'])->name('teams.members.store');
     Route::delete('teams/{team}/members/{employee}', [TeamController::class, 'removeMember'])
@@ -95,6 +98,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('shifts', [ShiftController::class, 'index'])->name('shifts.index');
     Route::post('shifts', [ShiftController::class, 'store'])->name('shifts.store');
     Route::put('shifts/{shift}', [ShiftController::class, 'update'])->name('shifts.update');
+    Route::delete('shifts/{shift}', [ShiftController::class, 'destroy'])->name('shifts.destroy');
     Route::post('shift-overrides', [ShiftOverrideController::class, 'store'])->name('shift-overrides.store');
 
     Route::get('holidays', [HolidayController::class, 'index'])->name('holidays.index');
@@ -113,6 +117,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('announcements', [AnnouncementController::class, 'index'])->name('announcements.index');
     Route::post('announcements', [AnnouncementController::class, 'store'])->name('announcements.store');
     Route::put('announcements/{announcement}', [AnnouncementController::class, 'update'])->name('announcements.update');
+    Route::delete('announcements/{announcement}', [AnnouncementController::class, 'destroy'])->name('announcements.destroy');
     Route::post('announcements/{announcement}/publish', [AnnouncementController::class, 'publish'])
         ->name('announcements.publish');
     Route::post('announcements/{announcement}/read', [AnnouncementController::class, 'read'])
@@ -156,6 +161,9 @@ Route::middleware('auth:sanctum')->group(function () {
         ->name('overtime.adjust');
 
     Route::get('salary-components', [SalaryComponentController::class, 'index'])->name('salary-components.index');
+    Route::post('salary-components', [SalaryComponentController::class, 'store'])->name('salary-components.store');
+    Route::put('salary-components/{salaryComponent}', [SalaryComponentController::class, 'update'])->name('salary-components.update');
+    Route::delete('salary-components/{salaryComponent}', [SalaryComponentController::class, 'destroy'])->name('salary-components.destroy');
 
     Route::prefix('payroll')->name('payroll.')->group(function () {
         Route::get('periods', [PayrollPeriodController::class, 'index'])->name('periods.index');

@@ -54,6 +54,20 @@ class TeamController extends Controller
         );
     }
 
+    public function destroy(Team $team): Response
+    {
+        abort_unless(Gate::allows('delete', $team), 403);
+        abort_if(
+            $team->teamMembers()->exists(),
+            409,
+            'This team has members on record (current or past). Remove current members and archive instead.',
+        );
+
+        $team->delete();
+
+        return response()->noContent();
+    }
+
     public function update(SaveTeamRequest $request, Team $team): JsonResponse
     {
         Gate::authorize('update', Team::class);

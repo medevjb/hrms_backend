@@ -49,6 +49,16 @@ class AnnouncementPolicy
         return $user->hasPermission(PermissionName::AnnouncementPublish);
     }
 
+    /**
+     * Only a draft can be deleted — a published announcement is a record of
+     * something people were shown, so it stays.
+     */
+    public function delete(User $user, Announcement $announcement): bool
+    {
+        return $announcement->status === AnnouncementStatus::Draft
+            && $user->hasPermission(PermissionName::AnnouncementCreate);
+    }
+
     public function read(User $user, Announcement $announcement): bool
     {
         return $user->employee !== null

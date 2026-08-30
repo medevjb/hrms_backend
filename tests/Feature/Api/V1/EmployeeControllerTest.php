@@ -1,8 +1,11 @@
 <?php
 
+use App\Enums\AuditAction;
 use App\Enums\EmployeeStatus;
 use App\Enums\PermissionName;
 use App\Enums\Scope;
+use App\Models\AttendanceRecord;
+use App\Models\AuditLog;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Permission;
@@ -165,4 +168,46 @@ test('updating status writes a status history entry', function () {
     $response->assertOk();
     $response->assertJsonPath('data.status', 'ACTIVE');
     expect($employee->statusHistory()->latest()->first()->reason)->toBe('Probation completed');
+});
+
+test('deleting an employee without employee.archive is 404', function () {
+    $employee = Employee::factory()->invited()->create();
+    $user = userWithPermission(PermissionName::EmployeeView);
+
+    $this->actingAs($user)->deleteJson("/api/v1/employees/{$employee->id}")->assertStatus(404);
+});
+
+test('an invited employee with no history can be deleted along with their user', function () {
+    $employee = Employee::factory()->invited()->create();
+    $userId = $employee->user_id;
+    $user = userWithPermission(PermissionName::EmployeeArchive);
+
+    $this->actingAs($user)
+        ->deleteJson("/api/v1/employees/{$employee->id}")
+        ->assertNoContent();
+
+    expect(Employee::query()->find($employee->id))->toBeNull()
+        ->and(User::query()->find($userId))->toBeNull()
+        ->and(AuditLog::query()->where('action', AuditAction::EmployeeDeleted)->exists())->toBeTrue();
+});
+
+test('an active employee cannot be deleted', function () {
+    $employee = Employee::factory()->create(); // ACTIVE by default
+    $user = userWithPermission(PermissionName::EmployeeArchive);
+
+    $this->actingAs($user)
+        ->deleteJson("/api/v1/employees/{$employee->id}")
+        ->assertStatus(409);
+
+    expect(Employee::query()->find($employee->id))->not->toBeNull();
+});
+
+test('an invited employee with attendance history cannot be deleted', function () {
+    $employee = Employee::factory()->invited()->create();
+    AttendanceRecord::factory()->create(['employee_id' => $employee->id]);
+    $user = userWithPermission(PermissionName::EmployeeArchive);
+
+    $this->actingAs($user)
+        ->deleteJson("/api/v1/employees/{$employee->id}")
+        ->assertStatus(409);
 });

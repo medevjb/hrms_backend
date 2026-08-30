@@ -37,6 +37,17 @@ class EmployeePolicy
     }
 
     /**
+     * A hard delete is only for an invited employee who never onboarded
+     * (created by mistake, or the hire fell through). Anyone who has ever
+     * been ACTIVE keeps their history — archive or terminate them instead
+     * (§13). Gated on `employee.archive`.
+     */
+    public function delete(User $user, Employee $employee): bool
+    {
+        return $this->canForScope($user, $employee, PermissionName::EmployeeArchive);
+    }
+
+    /**
      * docs/PRD.md §12 — salary is stronger than employee.view. An employee
      * may always see their own salary; anyone else needs
      * employee.financial.view resolved to this employee's scope.

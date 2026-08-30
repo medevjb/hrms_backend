@@ -19,6 +19,7 @@ use App\Services\ScopeResolver;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 
 class EmployeeController extends Controller
@@ -103,6 +104,15 @@ class EmployeeController extends Controller
         $employee->update($request->validated());
 
         return ApiResponse::data(new EmployeeResource($employee->fresh(self::EAGER_LOAD)));
+    }
+
+    public function destroy(Employee $employee, EmployeeService $employees): Response
+    {
+        abort_unless(Gate::allows('delete', $employee), 404);
+
+        $employees->delete($employee, request()->user());
+
+        return response()->noContent();
     }
 
     public function updateStatus(

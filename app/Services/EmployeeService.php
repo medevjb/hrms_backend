@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\Shift;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 
@@ -53,6 +54,62 @@ class EmployeeService
         Password::broker('employee_invitations')->sendResetLink($user->only('email'));
 
         return $employee;
+    }
+
+    /**
+     * Permanently removes an employee and their paired user account. Only
+     * ever allowed for an INVITED employee with no operational history —
+     * a mistaken invite or a hire that fell through. Everyone else keeps
+     * their records; use a status change (§13) instead.
+     */
+    public function delete(Employee $employee, User $actor): void
+    {
+        abort_unless(
+            $employee->status === EmployeeStatus::Invited,
+            409,
+            'Only an invited employee who has not onboarded can be deleted. Archive or terminate an active employee instead.',
+        );
+
+        $blockers = [
+            'attendance records' => $employee->attendanceRecords()->exists(),
+            'leave requests' => $employee->leaveRequests()->exists(),
+            'overtime records' => $employee->overtimeRecords()->exists(),
+            'payroll entries' => $employee->payrollEntries()->exists(),
+            'salary history' => $employee->salaries()->exists(),
+            'documents' => $employee->documents()->exists(),
+            'team memberships' => $employee->teamMemberships()->exists(),
+        ];
+
+        $present = array_keys(array_filter($blockers));
+
+        abort_unless(
+            $present === [],
+            409,
+            'This employee has '.implode(', ', $present).' on record and cannot be deleted. Archive them instead.',
+        );
+
+        DB::transaction(function () use ($employee, $actor) {
+            $user = $employee->user;
+
+            app(AuditLogger::class)->record(
+                AuditAction::EmployeeDeleted,
+                $employee,
+                oldData: [
+                    'employee_code' => $employee->employee_code,
+                    'name' => $employee->fullName(),
+                    'email' => $user?->email,
+                ],
+                reason: 'Invited employee deleted before onboarding',
+                actor: $actor,
+            );
+
+            $employee->delete();
+
+            if ($user !== null) {
+                DB::table('password_reset_tokens')->where('email', $user->email)->delete();
+                $user->delete();
+            }
+        });
     }
 
     public function transitionStatus(
