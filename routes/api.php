@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Api\V1\Auth\NewPasswordController;
 use App\Http\Controllers\Api\V1\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Api\V1\Auth\TwoFactorAuthenticatedSessionController;
+use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DepartmentController;
 use App\Http\Controllers\Api\V1\EmployeeController;
 use App\Http\Controllers\Api\V1\EmployeeSalaryController;
@@ -41,6 +42,8 @@ Route::prefix('auth')->name('auth.')->group(function () {
 });
 
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('dashboard', [DashboardController::class, 'show'])->name('dashboard.show');
+
     Route::get('users/{user}/roles', [UserRoleController::class, 'index'])->name('users.roles.index');
     Route::post('users/{user}/roles', [UserRoleController::class, 'store'])->name('users.roles.store');
     Route::delete('users/{user}/roles/{userRole}', [UserRoleController::class, 'destroy'])
