@@ -8,12 +8,17 @@ use App\Http\Controllers\Api\V1\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Api\V1\Auth\TwoFactorAuthenticatedSessionController;
 use App\Http\Controllers\Api\V1\DepartmentController;
 use App\Http\Controllers\Api\V1\EmployeeController;
+use App\Http\Controllers\Api\V1\EmployeeSalaryController;
 use App\Http\Controllers\Api\V1\HolidayController;
 use App\Http\Controllers\Api\V1\HolidayNoticeController;
+use App\Http\Controllers\Api\V1\LatePenaltyRuleController;
 use App\Http\Controllers\Api\V1\LeaveBalanceController;
 use App\Http\Controllers\Api\V1\LeaveRequestController;
 use App\Http\Controllers\Api\V1\LeaveTypeController;
 use App\Http\Controllers\Api\V1\OvertimeController;
+use App\Http\Controllers\Api\V1\PayrollEntryController;
+use App\Http\Controllers\Api\V1\PayrollPeriodController;
+use App\Http\Controllers\Api\V1\SalaryComponentController;
 use App\Http\Controllers\Api\V1\SettingsController;
 use App\Http\Controllers\Api\V1\ShiftController;
 use App\Http\Controllers\Api\V1\ShiftOverrideController;
@@ -50,6 +55,8 @@ Route::middleware('auth:sanctum')->group(function () {
         ->name('employees.transfer');
     Route::post('employees/{employee}/assign-shift', [EmployeeController::class, 'assignShift'])
         ->name('employees.assign-shift');
+    Route::get('employees/{employee}/salary', [EmployeeSalaryController::class, 'show'])->name('employees.salary.show');
+    Route::put('employees/{employee}/salary', [EmployeeSalaryController::class, 'update'])->name('employees.salary.update');
 
     Route::get('departments', [DepartmentController::class, 'index'])->name('departments.index');
     Route::post('departments', [DepartmentController::class, 'store'])->name('departments.store');
@@ -128,6 +135,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('overtime/{overtimeRecord}/adjust', [OvertimeController::class, 'adjust'])
         ->name('overtime.adjust');
 
+    Route::get('salary-components', [SalaryComponentController::class, 'index'])->name('salary-components.index');
+
+    Route::prefix('payroll')->name('payroll.')->group(function () {
+        Route::get('periods', [PayrollPeriodController::class, 'index'])->name('periods.index');
+        Route::post('periods', [PayrollPeriodController::class, 'store'])->name('periods.store');
+        Route::get('periods/{payrollPeriod}', [PayrollPeriodController::class, 'show'])->name('periods.show');
+        Route::post('periods/{payrollPeriod}/generate', [PayrollPeriodController::class, 'generate'])
+            ->name('periods.generate');
+
+        Route::get('entries', [PayrollEntryController::class, 'index'])->name('entries.index');
+        Route::get('entries/{payrollEntry}', [PayrollEntryController::class, 'show'])->name('entries.show');
+        Route::post('entries/{payrollEntry}/adjust', [PayrollEntryController::class, 'adjust'])->name('entries.adjust');
+    });
+
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::get('organization', [SettingsController::class, 'organization'])->name('organization.show');
         Route::put('organization', [SettingsController::class, 'updateOrganization'])->name('organization.update');
@@ -139,5 +160,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('payroll', [SettingsController::class, 'updatePayroll'])->name('payroll.update');
         Route::get('leave', [SettingsController::class, 'leave'])->name('leave.show');
         Route::put('leave', [SettingsController::class, 'updateLeave'])->name('leave.update');
+        Route::get('late-penalty-rules', [LatePenaltyRuleController::class, 'index'])->name('late-penalty-rules.show');
+        Route::put('late-penalty-rules', [LatePenaltyRuleController::class, 'update'])->name('late-penalty-rules.update');
     });
 });

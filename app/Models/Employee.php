@@ -179,4 +179,25 @@ class Employee extends Model
     {
         return $this->hasMany(OvertimeRecord::class);
     }
+
+    /**
+     * @return HasMany<EmployeeSalary, $this>
+     */
+    public function salaries(): HasMany
+    {
+        return $this->hasMany(EmployeeSalary::class);
+    }
+
+    public function currentSalary(): ?EmployeeSalary
+    {
+        return $this->salaries()->whereNull('ended_at')->latest('effective_from')->first();
+    }
+
+    /**
+     * @return HasMany<PayrollEntry, $this>
+     */
+    public function payrollEntries(): HasMany
+    {
+        return $this->hasMany(PayrollEntry::class);
+    }
 }

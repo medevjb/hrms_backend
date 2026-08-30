@@ -14,6 +14,7 @@ use App\Http\Resources\Api\V1\OrganizationSettingsResource;
 use App\Http\Resources\Api\V1\OvertimeSettingsResource;
 use App\Http\Resources\Api\V1\PayrollSettingsResource;
 use App\Models\OrganizationSettings;
+use App\Models\PayrollSettings;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
@@ -87,8 +88,21 @@ class SettingsController extends Controller
     {
         Gate::authorize('payroll', OrganizationSettings::class);
 
+        $validated = $request->validated();
+
+        $organizationKeys = ['payroll_cutoff_day', 'salary_day_calculation_method'];
+        $organizationValues = array_intersect_key($validated, array_flip($organizationKeys));
+        $payrollValues = array_diff_key($validated, array_flip($organizationKeys));
+
         $settings = OrganizationSettings::current();
-        $settings->update($request->validated());
+
+        if ($organizationValues !== []) {
+            $settings->update($organizationValues);
+        }
+
+        if ($payrollValues !== []) {
+            PayrollSettings::current()->fill($payrollValues)->save();
+        }
 
         return ApiResponse::data(new PayrollSettingsResource($settings->fresh()));
     }

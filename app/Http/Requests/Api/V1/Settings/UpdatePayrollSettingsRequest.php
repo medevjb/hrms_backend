@@ -21,6 +21,11 @@ class UpdatePayrollSettingsRequest extends FormRequest
         return [
             'payroll_cutoff_day' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:28'],
             'salary_day_calculation_method' => ['sometimes', Rule::enum(SalaryDayCalculationMethod::class)],
+            'late_penalty_enabled' => ['sometimes', 'boolean'],
+            'absence_deduction_enabled' => ['sometimes', 'boolean'],
+            'unpaid_leave_deduction_enabled' => ['sometimes', 'boolean'],
+            'overtime_earnings_enabled' => ['sometimes', 'boolean'],
+            'dispute_window_days' => ['sometimes', 'integer', 'min:1', 'max:60'],
         ];
     }
 }
