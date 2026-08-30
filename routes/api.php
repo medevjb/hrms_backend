@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Api\V1\Auth\TwoFactorAuthenticatedSessionController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DepartmentController;
+use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Controllers\Api\V1\EmployeeController;
 use App\Http\Controllers\Api\V1\EmployeeSalaryController;
 use App\Http\Controllers\Api\V1\HolidayController;
@@ -20,6 +21,7 @@ use App\Http\Controllers\Api\V1\OvertimeController;
 use App\Http\Controllers\Api\V1\PayrollDisputeController;
 use App\Http\Controllers\Api\V1\PayrollEntryController;
 use App\Http\Controllers\Api\V1\PayrollPeriodController;
+use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\SalaryComponentController;
 use App\Http\Controllers\Api\V1\SettingsController;
 use App\Http\Controllers\Api\V1\ShiftController;
@@ -61,6 +63,15 @@ Route::middleware('auth:sanctum')->group(function () {
         ->name('employees.assign-shift');
     Route::get('employees/{employee}/salary', [EmployeeSalaryController::class, 'show'])->name('employees.salary.show');
     Route::put('employees/{employee}/salary', [EmployeeSalaryController::class, 'update'])->name('employees.salary.update');
+    Route::get('employees/{employee}/documents', [DocumentController::class, 'index'])->name('employees.documents.index');
+    Route::post('employees/{employee}/documents', [DocumentController::class, 'store'])->name('employees.documents.store');
+
+    Route::get('documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download');
+    Route::delete('documents/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
+
+    Route::get('reports', [ReportController::class, 'types'])->name('reports.types');
+    Route::get('reports/{type}', [ReportController::class, 'show'])->name('reports.show');
+    Route::get('reports/{type}/export', [ReportController::class, 'export'])->name('reports.export');
 
     Route::get('departments', [DepartmentController::class, 'index'])->name('departments.index');
     Route::post('departments', [DepartmentController::class, 'store'])->name('departments.store');

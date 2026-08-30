@@ -208,4 +208,12 @@ class Employee extends Model
     {
         return $this->hasMany(PayrollArrear::class);
     }
+
+    /**
+     * @return HasMany<Document, $this>
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(Document::class);
+    }
 }
