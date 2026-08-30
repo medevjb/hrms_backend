@@ -16,8 +16,6 @@ class AuditLogFactory extends Factory
         return [
             'user_id' => User::factory(),
             'action' => AuditAction::SalaryChanged,
-            'entity_type' => 'App\\Models\\Employee',
-            'entity_id' => 1,
             'reason' => fake()->sentence(),
             'ip_address' => fake()->ipv4(),
         ];

@@ -12,7 +12,6 @@ use App\Models\User;
 use App\Models\UserRole;
 use App\Services\SalaryService;
 use Illuminate\Support\Carbon;
-use RuntimeException;
 
 /**
  * docs/PRD.md §83 — the append-only audit trail and its read-only viewer.
