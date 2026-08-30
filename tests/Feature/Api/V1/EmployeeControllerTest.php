@@ -11,6 +11,7 @@ use App\Models\Employee;
 use App\Models\EmployeeStatusHistory;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Shift;
 use App\Models\Team;
 use App\Models\TeamMember;
 use App\Models\User;
@@ -50,6 +51,65 @@ test('a user with employee.view @ ALL_EMPLOYEES sees everyone', function () {
 
     $response->assertOk();
     $response->assertJsonCount(3, 'data');
+});
+
+test('filter[search] matches name, code, designation, or email', function () {
+    $user = userWithPermission(PermissionName::EmployeeView);
+    $target = Employee::factory()
+        ->for(User::factory()->state(['email' => 'aisha.k@example.com']))
+        ->create(['first_name' => 'Aisha', 'last_name' => 'Karim', 'employee_code' => 'EMP-90001', 'designation' => 'Data Analyst']);
+    Employee::factory()->count(2)->create(['designation' => 'Engineer']);
+
+    $byName = $this->actingAs($user)->getJson('/api/v1/employees?filter[search]=aisha kar');
+    $byName->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $target->id);
+
+    $byCode = $this->actingAs($user)->getJson('/api/v1/employees?filter[search]=90001');
+    $byCode->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $target->id);
+
+    $byEmail = $this->actingAs($user)->getJson('/api/v1/employees?filter[search]=aisha.k@example');
+    $byEmail->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $target->id);
+});
+
+test('filter[employment_type] and filter[shift_id] narrow the list', function () {
+    $user = userWithPermission(PermissionName::EmployeeView);
+    $shift = Shift::factory()->create();
+    $intern = Employee::factory()->create(['employment_type' => 'INTERN']);
+    $intern->shiftAssignments()->create(['shift_id' => $shift->id, 'started_at' => now()->toDateString()]);
+    Employee::factory()->count(2)->create(['employment_type' => 'FULL_TIME']);
+
+    $this->actingAs($user)->getJson('/api/v1/employees?filter[employment_type]=INTERN')
+        ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $intern->id);
+
+    $this->actingAs($user)->getJson("/api/v1/employees?filter[shift_id]={$shift->id}")
+        ->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $intern->id);
+});
+
+test('filter[joined_from]/filter[joined_to] and filter[unassigned] work', function () {
+    $user = userWithPermission(PermissionName::EmployeeView);
+    $recent = Employee::factory()->create(['joining_date' => '2026-06-15']);
+    Employee::factory()->create(['joining_date' => '2023-01-10']);
+    TeamMember::factory()->create(['employee_id' => Employee::factory()->create()->id]);
+
+    $this->actingAs($user)->getJson('/api/v1/employees?filter[joined_from]=2026-01-01')
+        ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $recent->id);
+
+    // The two factory employees with no TeamMember row are unassigned.
+    $this->actingAs($user)->getJson('/api/v1/employees?filter[unassigned]=1')
+        ->assertJsonCount(2, 'data');
+});
+
+test('sort=joined_desc orders newest hire first and per_page is capped at 100', function () {
+    $user = userWithPermission(PermissionName::EmployeeView);
+    $older = Employee::factory()->create(['joining_date' => '2020-01-01']);
+    $newer = Employee::factory()->create(['joining_date' => '2026-01-01']);
+
+    $sorted = $this->actingAs($user)->getJson('/api/v1/employees?sort=joined_desc');
+    $sorted->assertOk()
+        ->assertJsonPath('data.0.id', $newer->id)
+        ->assertJsonPath('data.1.id', $older->id);
+
+    $this->actingAs($user)->getJson('/api/v1/employees?per_page=5000')
+        ->assertJsonPath('meta.per_page', 100);
 });
 
 test('a user with employee.view @ TEAM only sees their teams members', function () {

@@ -39,7 +39,7 @@ class EmployeeController extends Controller
 
         $allowedIds = $this->scopeResolver->employeeIdsFor($request->user(), PermissionName::EmployeeView);
 
-        $query = Employee::query()->with(self::EAGER_LOAD)->orderBy('first_name')->orderBy('last_name');
+        $query = Employee::query()->with(self::EAGER_LOAD);
 
         if ($allowedIds !== null) {
             $query->whereIn('id', $allowedIds);
@@ -52,6 +52,10 @@ class EmployeeController extends Controller
         // string. input() goes through data_get(), which does support it.
         if ($status = $request->input('filter.status')) {
             $query->where('status', $status);
+        }
+
+        if ($employmentType = $request->input('filter.employment_type')) {
+            $query->where('employment_type', $employmentType);
         }
 
         if ($teamId = $request->input('filter.team_id')) {
@@ -68,7 +72,70 @@ class EmployeeController extends Controller
             );
         }
 
-        $employees = $query->paginate((int) $request->integer('per_page', 25));
+        if ($teamLeaderId = $request->input('filter.team_leader_id')) {
+            $query->whereHas(
+                'currentTeamMembership.team',
+                fn ($q) => $q->where('team_leader_id', $teamLeaderId),
+            );
+        }
+
+        if ($operationManagerId = $request->input('filter.operation_manager_id')) {
+            $query->whereHas(
+                'currentTeamMembership.team.department',
+                fn ($q) => $q->where('operation_manager_id', $operationManagerId),
+            );
+        }
+
+        if ($shiftId = $request->input('filter.shift_id')) {
+            $query->whereHas(
+                'currentShiftAssignment',
+                fn ($q) => $q->where('shift_id', $shiftId),
+            );
+        }
+
+        if ($request->has('filter.overtime_eligible')) {
+            $query->where('overtime_eligible', $request->boolean('filter.overtime_eligible'));
+        }
+
+        if ($request->boolean('filter.unassigned')) {
+            $query->whereDoesntHave('currentTeamMembership');
+        }
+
+        if ($joinedFrom = $request->input('filter.joined_from')) {
+            $query->whereDate('joining_date', '>=', $joinedFrom);
+        }
+
+        if ($joinedTo = $request->input('filter.joined_to')) {
+            $query->whereDate('joining_date', '<=', $joinedTo);
+        }
+
+        if ($search = trim((string) $request->input('filter.search', ''))) {
+            $like = '%'.$search.'%';
+            $query->where(function ($q) use ($like) {
+                $q->where('first_name', 'like', $like)
+                    ->orWhere('last_name', 'like', $like)
+                    ->orWhere('employee_code', 'like', $like)
+                    ->orWhere('designation', 'like', $like)
+                    ->orWhereRaw("concat(first_name, ' ', last_name) like ?", [$like])
+                    ->orWhereHas('user', fn ($u) => $u->where('email', 'like', $like));
+            });
+        }
+
+        [$sortColumn, $sortDirection] = match ($request->input('sort')) {
+            'name_desc' => ['first_name', 'desc'],
+            'joined' => ['joining_date', 'asc'],
+            'joined_desc' => ['joining_date', 'desc'],
+            'code' => ['employee_code', 'asc'],
+            'code_desc' => ['employee_code', 'desc'],
+            default => ['first_name', 'asc'],
+        };
+        $query->orderBy($sortColumn, $sortDirection);
+        if ($sortColumn === 'first_name') {
+            $query->orderBy('last_name', $sortDirection);
+        }
+
+        $perPage = min(100, max(1, (int) $request->integer('per_page', 25)));
+        $employees = $query->paginate($perPage);
 
         return response()->json([
             'data' => EmployeeResource::collection($employees->items()),
