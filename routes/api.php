@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AnnouncementController;
 use App\Http\Controllers\Api\V1\AttendanceController;
 use App\Http\Controllers\Api\V1\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Api\V1\Auth\NewPasswordController;
@@ -8,6 +9,7 @@ use App\Http\Controllers\Api\V1\Auth\TwoFactorAuthenticatedSessionController;
 use App\Http\Controllers\Api\V1\DepartmentController;
 use App\Http\Controllers\Api\V1\EmployeeController;
 use App\Http\Controllers\Api\V1\HolidayController;
+use App\Http\Controllers\Api\V1\HolidayNoticeController;
 use App\Http\Controllers\Api\V1\LeaveBalanceController;
 use App\Http\Controllers\Api\V1\LeaveRequestController;
 use App\Http\Controllers\Api\V1\LeaveTypeController;
@@ -72,6 +74,22 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('holidays', [HolidayController::class, 'store'])->name('holidays.store');
     Route::put('holidays/{holiday}', [HolidayController::class, 'update'])->name('holidays.update');
     Route::delete('holidays/{holiday}', [HolidayController::class, 'destroy'])->name('holidays.destroy');
+
+    Route::get('holiday-notices', [HolidayNoticeController::class, 'index'])->name('holiday-notices.index');
+    Route::post('holiday-notices/{holidayNotice}/approve', [HolidayNoticeController::class, 'approve'])
+        ->name('holiday-notices.approve');
+    Route::post('holiday-notices/{holidayNotice}/dismiss', [HolidayNoticeController::class, 'dismiss'])
+        ->name('holiday-notices.dismiss');
+    Route::get('holiday-notices/{holidayNotice}/download', [HolidayNoticeController::class, 'download'])
+        ->name('holiday-notices.download');
+
+    Route::get('announcements', [AnnouncementController::class, 'index'])->name('announcements.index');
+    Route::post('announcements', [AnnouncementController::class, 'store'])->name('announcements.store');
+    Route::put('announcements/{announcement}', [AnnouncementController::class, 'update'])->name('announcements.update');
+    Route::post('announcements/{announcement}/publish', [AnnouncementController::class, 'publish'])
+        ->name('announcements.publish');
+    Route::post('announcements/{announcement}/read', [AnnouncementController::class, 'read'])
+        ->name('announcements.read');
 
     Route::get('attendance/today', [AttendanceController::class, 'today'])->name('attendance.today');
     Route::post('attendance/check-in', [AttendanceController::class, 'checkIn'])->name('attendance.check-in');

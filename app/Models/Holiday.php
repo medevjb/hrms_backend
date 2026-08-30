@@ -7,6 +7,7 @@ use Database\Factories\HolidayFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -33,5 +34,21 @@ class Holiday extends Model
             'type' => HolidayType::class,
             'active' => 'boolean',
         ];
+    }
+
+    /**
+     * @return HasOne<HolidayReminder, $this>
+     */
+    public function reminder(): HasOne
+    {
+        return $this->hasOne(HolidayReminder::class);
+    }
+
+    /**
+     * @return HasOne<HolidayNotice, $this>
+     */
+    public function notice(): HasOne
+    {
+        return $this->hasOne(HolidayNotice::class);
     }
 }
