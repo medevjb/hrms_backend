@@ -3978,18 +3978,18 @@ the migration cycle — the authoritative link is `holiday_notices.announcement_
 
 Implement:
 
-* salary components;
-* employee salary;
-* salary history;
-* payroll settings;
-* payroll periods;
-* custom cutoff;
-* salary divisor;
-* late policies;
-* absence policies;
-* unpaid leave;
-* overtime earnings;
-* draft payroll calculation.
+* ☑ salary components;
+* ☑ employee salary;
+* ☑ salary history;
+* ☑ payroll settings;
+* ☑ payroll periods;
+* ☑ custom cutoff;
+* ☑ salary divisor;
+* ☑ late policies;
+* ☑ absence policies;
+* ☑ unpaid leave;
+* ☑ overtime earnings;
+* ☑ draft payroll calculation.
 
 Completion:
 
@@ -4008,6 +4008,73 @@ Adjustments
 =
 Draft Net Salary
 ```
+
+**Phase 8 status: complete, 2026-08-30.** Everything up to and including "System
+Calculates Draft" (§69); review, release, disputes, finalisation, payslip PDFs, and
+locking are Phase 9.
+
+**Money (§141).** New `App\Support\Money` — every payroll figure is a string through
+BCMath at internal scale 6, with a single half-up round to 4 places (`Money::round()`)
+when a value is persisted. `Money::of()` is the one ingestion point that turns request
+input / model attributes into a validated numeric string. No `float` touches a monetary
+quantity anywhere in payroll. `tests/Unit/MoneyTest.php` pins the half-up behaviour
+including negatives and the 30000/26 repeating case.
+
+**Salary (§59).** `salary_components` catalogue (seeded with §59's five —
+`SalaryComponentSeeder`), `employee_salaries` (effective-dated versions;
+`employee_salary_components` for the per-component breakdown §71 itemisation needs, not
+a JSON blob — §85), never overwritten: `SalaryService::assign()` closes the prior
+version with `ended_at = new effective_from − 1 day`. `salaryOn(date)` reads the version
+in force. §65 daily salary = gross ÷ divisor, where divisor is 30 / calendar-days /
+working-days by the method **snapshotted on the period** (§64). `GET|PUT
+/employees/{id}/salary`, `employee.financial.*` gated and scoped, self always readable
+(§12).
+
+**Periods (§63/§64).** `payroll_periods` with the §64 status set; `PayrollService::
+createPeriod(year, month)` derives boundaries from `organization_settings.
+payroll_cutoff_day` — null → 1st-to-month-end, `25` → 26th-of-previous to 25th — and
+snapshots the cutoff day and salary-day method. `payroll_settings` singleton (new
+table, `PayrollSettings::current()` mirroring the OrganizationSettings raw-attributes
+cache) holds the `late_penalty` / `absence` / `unpaid_leave` / `overtime` toggles and
+the §147 `dispute_window_days` (default 7).
+
+**Draft calc (§66).** `PayrollService::generate()` builds a `payroll_entry` per active
+employee with a salary in force on the period end and calls `calculate()`, which
+rebuilds `payroll_entry_lines` from scratch each time:
+
+```
+basic + allowance lines (from the salary version)
++ overtime      (daily × OvertimeService::approvedOvertimeDaysFor)
+− late penalty  (§61 tier: newest late_penalty_rules version effective ≤ period end,
+                 highest threshold the qualified LATE count reaches; DAY_FRACTION or
+                 FIXED_AMOUNT)
+− absence       (daily × ABSENT attendance days)
+− unpaid leave  (daily × HR_APPROVED unpaid-leave-type days overlapping the period)
++ manual §68 adjustments (payroll_adjustments → one line each, reason/prev/new kept)
+= net
+```
+
+Every line carries `computed_from` (the inputs, §141) so a Phase 9 dispute can be
+recomputed. `late_penalty_rules` is effective-dated and tiered (`PUT
+/settings/late-penalty-rules` replaces one version's tiers, older versions stay for
+historical periods). `POST /payroll/entries/{id}/adjust` (`payroll.adjust`) records the
+adjustment and recalculates. A FINALIZED/PAID/LOCKED period rejects generate/recalc/
+adjust with 409.
+
+**Frontend.** `/payroll` — Periods tab (create, open) and a My payslips tab; a period
+detail page with Generate/Recalculate draft and a per-employee table opening a full
+earnings/deductions breakdown with an Add adjustment dialog. Employee detail page gains
+a Salary card (current + revise, `employee.financial.*` gated). Settings → Payroll
+gains the toggles, dispute window, and a late-penalty tier editor.
+
+340 backend tests pass (29 new: `MoneyTest`, `SalaryServiceTest`,
+`PayrollCalculationTest`, `PayrollControllerTest`), 2 pre-existing Fortify skips;
+`phpstan` / `pint` clean; frontend typecheck / lint / build clean.
+
+V1 simplifications, stated not half-built: unpaid leave counts a request's whole
+`days_requested` when it overlaps the period at all (boundary-splitting is a Phase 9
+refinement); the §65 daily-salary base is gross, not basic; `salary_structures`
+templates from §84 are skipped, since no V1 workflow assembles a salary from a template.
 
 **Dependency:** Phase 7.
 
