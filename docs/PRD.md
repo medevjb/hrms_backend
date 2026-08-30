@@ -4153,12 +4153,36 @@ clean; frontend typecheck / lint / build clean.
 
 Implement role-specific dashboards for:
 
-* Team Member;
-* Team Leader;
-* Operation Manager;
-* HR;
-* Head HR;
-* Admin.
+* ☑ Team Member;
+* ☑ Team Leader;
+* ☑ Operation Manager;
+* ☑ HR;
+* ☑ Head HR;
+* ☑ Admin.
+
+**Phase 10 status: complete, 2026-08-30.** One endpoint, not six — `GET
+/api/v1/dashboard` returns a role-aware payload assembled by `DashboardService`. Rather
+than a fixed template per role (§73–§78), each widget is included only when the caller's
+permissions warrant it and is computed from real data scoped through `ScopeResolver`
+(§10) — no fabricated numbers, no widget the caller can't act on. A Team Member sees
+`me`; a Team Leader additionally sees `attendance_today` and `pending_approvals` scoped
+to their team; HR/Head HR/Admin accumulate `workforce`, `payroll`, and the org-wide
+approval counts. Widgets: `me` (today's attendance, leave balances, pending leave /
+overtime, payslips awaiting confirmation), `attendance_today` (present/late/absent/
+on-leave/missing-checkout counts, scoped), `pending_approvals` (leave / overtime /
+holiday-notice / payroll-dispute counts, each for the caller's own queue), `workforce`
+(count by status, departments, teams), `payroll` (current period status + entries
+awaiting confirmation, open-period count), `upcoming_holidays`, `announcements` (recent
+5 + unread count).
+
+Frontend: `DashboardOverview` was rewritten to consume `/dashboard` and render only the
+sections in the payload — stat tiles across the top, then "Waiting on you", "My leave
+balances", the current payroll period, upcoming holidays, and recent announcements as
+cards. The existing `TodayAttendanceCard` stays. The §79 technical dashboard for System
+Admin/DevOps belongs to the `/system` Inertia console (Phase 12), not this frontend.
+
+360 backend tests pass (5 new: `DashboardControllerTest`), 2 pre-existing Fortify skips;
+`phpstan` / `pint` clean; frontend typecheck / lint / build clean.
 
 **Dependency:** Phase 9.
 
