@@ -53,11 +53,38 @@ class EmployeeService
 
         $this->recordStatusChange($employee, null, EmployeeStatus::Invited, 'Employee created', $invitedBy);
 
+        $this->sendInvitation($user);
+
+        return $employee;
+    }
+
+    /**
+     * Re-issues the invitation link for someone who hasn't onboarded yet.
+     * The original link is single-use and expires after 72h, and it shares
+     * a token with the ordinary password-reset flow (docs/PRD.md §148 #2) —
+     * so any of "expired", "already clicked", or "they hit forgot-password"
+     * leaves HR with no way back in without this.
+     */
+    public function resendInvitation(Employee $employee): void
+    {
+        abort_unless(
+            $employee->status === EmployeeStatus::Invited,
+            409,
+            'Only an employee who has not accepted their invitation can be re-invited.',
+        );
+
+        $user = $employee->user;
+
+        abort_if($user === null, 409, 'This employee has no pending account to invite.');
+
+        $this->sendInvitation($user);
+    }
+
+    private function sendInvitation(User $user): void
+    {
         /** @var PasswordBroker $broker */
         $broker = Password::broker('employee_invitations');
         $user->notify(new EmployeeInvitationNotification($broker->createToken($user)));
-
-        return $employee;
     }
 
     /**

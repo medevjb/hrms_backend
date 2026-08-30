@@ -284,3 +284,33 @@ test('an invited employee with attendance history cannot be deleted', function (
         ->deleteJson("/api/v1/employees/{$employee->id}")
         ->assertStatus(409);
 });
+
+test('resending an invitation re-notifies an invited employee', function () {
+    Notification::fake();
+    $employee = Employee::factory()->invited()->create();
+    $user = userWithPermission(PermissionName::EmployeeUpdate);
+
+    $this->actingAs($user)
+        ->postJson("/api/v1/employees/{$employee->id}/resend-invitation")
+        ->assertNoContent();
+
+    Notification::assertSentTo($employee->user, EmployeeInvitationNotification::class);
+});
+
+test('an already-onboarded employee cannot be re-invited', function () {
+    $employee = Employee::factory()->create(); // ACTIVE
+    $user = userWithPermission(PermissionName::EmployeeUpdate);
+
+    $this->actingAs($user)
+        ->postJson("/api/v1/employees/{$employee->id}/resend-invitation")
+        ->assertStatus(409);
+});
+
+test('resending an invitation without employee.update is 404', function () {
+    $employee = Employee::factory()->invited()->create();
+    $user = userWithPermission(PermissionName::EmployeeView);
+
+    $this->actingAs($user)
+        ->postJson("/api/v1/employees/{$employee->id}/resend-invitation")
+        ->assertStatus(404);
+});

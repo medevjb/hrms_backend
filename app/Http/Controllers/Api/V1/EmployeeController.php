@@ -182,6 +182,15 @@ class EmployeeController extends Controller
         return response()->noContent();
     }
 
+    public function resendInvitation(Employee $employee, EmployeeService $employees): Response
+    {
+        abort_unless(Gate::allows('update', $employee), 404);
+
+        $employees->resendInvitation($employee);
+
+        return response()->noContent();
+    }
+
     public function updateStatus(
         UpdateEmployeeStatusRequest $request,
         Employee $employee,

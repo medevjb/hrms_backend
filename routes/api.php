@@ -58,6 +58,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('employees/{employee}', [EmployeeController::class, 'show'])->name('employees.show');
     Route::put('employees/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
     Route::delete('employees/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
+    Route::post('employees/{employee}/resend-invitation', [EmployeeController::class, 'resendInvitation'])
+        ->name('employees.resend-invitation');
     Route::patch('employees/{employee}/status', [EmployeeController::class, 'updateStatus'])
         ->name('employees.update-status');
     Route::post('employees/{employee}/transfer', [EmployeeController::class, 'transfer'])
