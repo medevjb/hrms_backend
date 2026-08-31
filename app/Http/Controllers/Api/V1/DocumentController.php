@@ -67,6 +67,24 @@ class DocumentController extends Controller
         return Storage::disk('local')->download($document->file_path, $document->original_filename);
     }
 
+    /**
+     * Same authorised private stream as download(), but served inline so a
+     * PDF or image opens in the browser — the employee's read-only view of
+     * what HR filed for them (docs/PRD.md §82).
+     */
+    public function preview(Document $document): StreamedResponse
+    {
+        abort_unless(Gate::allows('view', $document), 404);
+
+        app(AuditLogger::class)->record(AuditAction::DocumentDownloaded, $document);
+
+        return Storage::disk('local')->response(
+            $document->file_path,
+            $document->original_filename,
+            ['Content-Type' => $document->mime_type],
+        );
+    }
+
     public function destroy(Document $document): Response
     {
         abort_unless(Gate::allows('delete', $document), 403);

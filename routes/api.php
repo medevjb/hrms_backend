@@ -94,6 +94,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('employees/{employee}/documents', [DocumentController::class, 'store'])->name('employees.documents.store');
 
     Route::get('documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download');
+    Route::get('documents/{document}/preview', [DocumentController::class, 'preview'])->name('documents.preview');
     Route::delete('documents/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
 
     Route::get('audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');

@@ -70,6 +70,24 @@ test('an employee can list and download their own documents but not others', fun
     $this->actingAs($mine->user)->get("/api/v1/documents/{$otherDoc->id}/download")->assertStatus(404);
 });
 
+test('an employee can preview their own document inline but not someone elses', function () {
+    $mine = Employee::factory()->create();
+    $mineDoc = Document::factory()->create([
+        'employee_id' => $mine->id,
+        'file_path' => 'employee-documents/mine.pdf',
+        'mime_type' => 'application/pdf',
+    ]);
+    Storage::disk('local')->put('employee-documents/mine.pdf', 'pdf-bytes');
+
+    $otherDoc = Document::factory()->create(['employee_id' => Employee::factory()->create()->id]);
+
+    $response = $this->actingAs($mine->user)->get("/api/v1/documents/{$mineDoc->id}/preview");
+    $response->assertOk();
+    expect($response->headers->get('Content-Disposition'))->toContain('inline');
+
+    $this->actingAs($mine->user)->get("/api/v1/documents/{$otherDoc->id}/preview")->assertStatus(404);
+});
+
 test('deleting a document requires document.manage and removes the file', function () {
     $employee = Employee::factory()->create();
     Storage::disk('local')->put('employee-documents/x.pdf', 'bytes');
