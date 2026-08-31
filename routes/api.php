@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\Auth\PasswordController;
 use App\Http\Controllers\Api\V1\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Api\V1\Auth\ProfileController;
 use App\Http\Controllers\Api\V1\Auth\TwoFactorAuthenticatedSessionController;
+use App\Http\Controllers\Api\V1\BrandingController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DepartmentController;
 use App\Http\Controllers\Api\V1\DocumentController;
@@ -53,6 +54,14 @@ Route::prefix('auth')->name('auth.')->group(function () {
         Route::delete('profile/photo', [ProfileController::class, 'deletePhoto'])->name('profile.photo.destroy');
         Route::put('password', [PasswordController::class, 'update'])->name('password.update');
     });
+});
+
+// Public — the sign-in screen and the browser tab render branded before
+// anyone has a session (§85).
+Route::prefix('branding')->name('branding.')->group(function () {
+    Route::get('/', [BrandingController::class, 'show'])->name('show');
+    Route::get('logo', [BrandingController::class, 'logo'])->name('logo');
+    Route::get('favicon', [BrandingController::class, 'favicon'])->name('favicon');
 });
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -210,6 +219,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::get('organization', [SettingsController::class, 'organization'])->name('organization.show');
         Route::put('organization', [SettingsController::class, 'updateOrganization'])->name('organization.update');
+        Route::get('branding', [SettingsController::class, 'branding'])->name('branding.show');
+        Route::post('branding', [SettingsController::class, 'updateBranding'])->name('branding.update');
+        Route::get('mail', [SettingsController::class, 'mail'])->name('mail.show');
+        Route::put('mail', [SettingsController::class, 'updateMail'])->name('mail.update');
+        Route::post('mail/test', [SettingsController::class, 'sendTestMail'])->name('mail.test');
         Route::get('attendance', [SettingsController::class, 'attendance'])->name('attendance.show');
         Route::put('attendance', [SettingsController::class, 'updateAttendance'])->name('attendance.update');
         Route::get('overtime', [SettingsController::class, 'overtime'])->name('overtime.show');

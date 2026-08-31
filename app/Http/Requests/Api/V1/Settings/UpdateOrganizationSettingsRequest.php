@@ -20,6 +20,7 @@ class UpdateOrganizationSettingsRequest extends FormRequest
     {
         return [
             'company_name' => ['sometimes', 'string', 'max:150'],
+            'app_title' => ['sometimes', 'nullable', 'string', 'max:150'],
             'company_logo_path' => ['sometimes', 'nullable', 'string', 'max:255'],
             'timezone' => ['sometimes', 'timezone'],
             'currency' => ['sometimes', 'string', 'size:3'],

@@ -1,11 +1,15 @@
 <?php
 
 use App\Enums\PermissionName;
+use App\Mail\TestMailMessage;
 use App\Models\OrganizationSettings;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRole;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 
 function userWithSettingsPermission(PermissionName $permission): User
 {
@@ -122,4 +126,84 @@ test('a user with payroll.settings.manage can update the payroll cutoff day', fu
 
     $response->assertOk();
     $response->assertJsonPath('data.payroll_cutoff_day', 25);
+});
+
+test('branding reads and updates require settings.manage', function () {
+    $this->actingAs(User::factory()->create())->getJson('/api/v1/settings/branding')->assertStatus(403);
+});
+
+test('an admin can set the app title and upload a logo', function () {
+    Storage::fake('local');
+    $user = userWithSettingsPermission(PermissionName::SettingsManage);
+
+    $response = $this->actingAs($user)->post('/api/v1/settings/branding', [
+        'company_name' => 'Northwind',
+        'app_title' => 'Northwind People',
+        'logo' => UploadedFile::fake()->image('logo.png', 200, 60),
+    ]);
+
+    $response->assertOk();
+    $response->assertJsonPath('data.company_name', 'Northwind');
+    $response->assertJsonPath('data.app_title', 'Northwind People');
+    expect($response->json('data.logo_url'))->toContain('/branding/logo');
+
+    $settings = OrganizationSettings::current();
+    expect($settings->company_logo_path)->not->toBeNull();
+    Storage::disk('local')->assertExists($settings->company_logo_path);
+});
+
+test('the public branding endpoint needs no session and falls back to the company name', function () {
+    OrganizationSettings::current()->update(['company_name' => 'Acme', 'app_title' => null]);
+
+    $this->getJson('/api/v1/branding')
+        ->assertOk()
+        ->assertJsonPath('company_name', 'Acme')
+        ->assertJsonPath('app_title', 'Acme')
+        ->assertJsonPath('logo_url', null);
+});
+
+test('mail settings never echo the password back, only whether one is stored', function () {
+    $user = userWithSettingsPermission(PermissionName::SettingsManage);
+
+    $this->actingAs($user)->putJson('/api/v1/settings/mail', [
+        'mail_from_name' => 'Acme HR',
+        'mail_from_address' => 'hr@acme.test',
+        'mail_host' => 'smtp.acme.test',
+        'mail_port' => 587,
+        'mail_username' => 'postmaster',
+        'mail_password' => 's3cret',
+        'mail_encryption' => 'tls',
+    ])->assertOk()
+        ->assertJsonPath('data.mail_password_set', true)
+        ->assertJsonPath('data.is_active', true)
+        ->assertJsonMissingPath('data.mail_password');
+
+    expect(OrganizationSettings::current()->mail_password)->toBe('s3cret');
+});
+
+test('omitting mail_password on a later update keeps the stored one', function () {
+    $user = userWithSettingsPermission(PermissionName::SettingsManage);
+    OrganizationSettings::current()->update(['mail_password' => 'keep-me', 'mail_host' => 'smtp.x', 'mail_from_address' => 'a@x.test']);
+
+    $this->actingAs($user)->putJson('/api/v1/settings/mail', ['mail_from_name' => 'Renamed'])->assertOk();
+
+    expect(OrganizationSettings::current()->mail_password)->toBe('keep-me');
+});
+
+test('the test-email endpoint sends a message and reports the recipient', function () {
+    Mail::fake();
+    $user = userWithSettingsPermission(PermissionName::SettingsManage);
+
+    $this->actingAs($user)->postJson('/api/v1/settings/mail/test', ['to' => 'admin@acme.test'])
+        ->assertOk()
+        ->assertJsonPath('data.sent_to', 'admin@acme.test');
+
+    Mail::assertSent(TestMailMessage::class, fn ($mail) => $mail->hasTo('admin@acme.test'));
+});
+
+test('the test-email endpoint validates the recipient address', function () {
+    $user = userWithSettingsPermission(PermissionName::SettingsManage);
+
+    $this->actingAs($user)->postJson('/api/v1/settings/mail/test', ['to' => 'not-an-email'])
+        ->assertStatus(422);
 });

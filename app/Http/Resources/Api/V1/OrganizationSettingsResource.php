@@ -16,7 +16,10 @@ class OrganizationSettingsResource extends JsonResource
     {
         return [
             'company_name' => $this->company_name,
+            'app_title' => $this->app_title,
             'company_logo_path' => $this->company_logo_path,
+            'logo_url' => $this->logoUrl(),
+            'favicon_url' => $this->faviconUrl(),
             'timezone' => $this->timezone,
             'currency' => $this->currency,
             'currency_decimal_places' => $this->currency_decimal_places,

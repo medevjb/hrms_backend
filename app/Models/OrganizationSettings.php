@@ -45,9 +45,19 @@ use Illuminate\Support\Facades\Cache;
  * @property int $attendance_checkin_window_minutes
  * @property int $leave_year_start_month
  * @property int|null $leave_carry_forward_cap_days
+ * @property string|null $app_title
+ * @property string|null $favicon_path
+ * @property string|null $mail_from_name
+ * @property string|null $mail_from_address
+ * @property string|null $mail_host
+ * @property int|null $mail_port
+ * @property string|null $mail_username
+ * @property string|null $mail_password
+ * @property string|null $mail_encryption
  */
 #[Fillable([
-    'company_name', 'company_logo_path', 'timezone', 'currency', 'currency_decimal_places',
+    'company_name', 'app_title', 'company_logo_path', 'favicon_path',
+    'timezone', 'currency', 'currency_decimal_places',
     'late_grace_minutes', 'weekend_days', 'default_weekend_day', 'default_shift_id',
     'payroll_cutoff_day', 'salary_day_calculation_method',
     'overtime_enabled', 'weekend_overtime_enabled', 'holiday_overtime_enabled',
@@ -55,6 +65,8 @@ use Illuminate\Support\Facades\Cache;
     'overtime_hourly_rate_mode', 'overtime_hourly_fixed_rate', 'overtime_hourly_multiplier',
     'auto_absent_enabled', 'missing_checkout_policy', 'attendance_min_minutes_half_day',
     'attendance_checkin_window_minutes', 'leave_year_start_month', 'leave_carry_forward_cap_days',
+    'mail_from_name', 'mail_from_address', 'mail_host', 'mail_port',
+    'mail_username', 'mail_password', 'mail_encryption',
 ])]
 class OrganizationSettings extends Model
 {
@@ -105,6 +117,7 @@ class OrganizationSettings extends Model
             'missing_checkout_policy' => MissingCheckoutPolicy::class,
             'overtime_hourly_fixed_rate' => 'decimal:4',
             'overtime_hourly_multiplier' => 'decimal:2',
+            'mail_password' => 'encrypted',
         ];
     }
 
@@ -177,5 +190,35 @@ class OrganizationSettings extends Model
         }
 
         return in_array(strtolower($date->englishDayOfWeek), $this->weekend_days, true);
+    }
+
+    /** The name shown in the browser tab and on the sign-in screen. */
+    public function displayTitle(): string
+    {
+        return $this->app_title ?: $this->company_name;
+    }
+
+    /**
+     * Cache-busting URL to the uploaded logo, or null. Points at the public
+     * branding route so the sign-in screen (no session yet) can load it.
+     */
+    public function logoUrl(): ?string
+    {
+        return $this->company_logo_path
+            ? '/branding/logo?v='.$this->updated_at?->timestamp
+            : null;
+    }
+
+    public function faviconUrl(): ?string
+    {
+        return $this->favicon_path
+            ? '/branding/favicon?v='.$this->updated_at?->timestamp
+            : null;
+    }
+
+    /** Does the org supply its own SMTP transport (vs. the server default)? */
+    public function hasCustomMailer(): bool
+    {
+        return filled($this->mail_host) && filled($this->mail_from_address);
     }
 }

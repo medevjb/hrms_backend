@@ -15,6 +15,8 @@ class UserResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $organization = OrganizationSettings::current();
+
         return [
             'id' => $this->id,
             'name' => $this->name,
@@ -33,7 +35,12 @@ class UserResource extends JsonResource
             // is settings.manage-gated — most employees don't hold that, so
             // it travels here instead, on the one request every session
             // already makes.
-            'organization' => ['timezone' => OrganizationSettings::current()->timezone],
+            'organization' => [
+                'timezone' => $organization->timezone,
+                'name' => $organization->company_name,
+                'app_title' => $organization->displayTitle(),
+                'logo_url' => $organization->logoUrl(),
+            ],
         ];
     }
 }

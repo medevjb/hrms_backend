@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\OrganizationMailConfig;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Contracts\Auth\CanResetPassword;
@@ -27,6 +28,12 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
         $this->configurePasswordResetUrl();
+
+        // §85 — outbound mail uses the organization's stored SMTP settings
+        // when it supplies them, falling back to the server's env config.
+        // Deferred to booted() so the DB and cache are ready and this never
+        // runs before migrations on a fresh install.
+        $this->app->booted(fn () => OrganizationMailConfig::apply());
     }
 
     /**
