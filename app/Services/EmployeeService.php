@@ -48,6 +48,7 @@ class EmployeeService
             'confirmation_date' => $data['confirmation_date'] ?? null,
             'office_location' => $data['office_location'] ?? null,
             'timezone' => $data['timezone'] ?? null,
+            'weekend_day' => $data['weekend_day'] ?? null,
             'overtime_eligible' => $data['overtime_eligible'] ?? true,
         ]);
 

@@ -222,6 +222,63 @@ test('updating an in-scope employee persists the change', function () {
     expect($employee->fresh()->designation)->toBe('Senior Engineer');
 });
 
+test('a per-employee weekend day can be set and cleared through update', function () {
+    $employee = Employee::factory()->create(['weekend_day' => null]);
+    $user = userWithPermission(PermissionName::EmployeeUpdate);
+
+    $this->actingAs($user)->putJson("/api/v1/employees/{$employee->id}", ['weekend_day' => 'monday'])
+        ->assertOk()
+        ->assertJsonPath('data.weekend_day', 'monday');
+    expect($employee->fresh()->weekend_day->value)->toBe('monday');
+
+    $this->actingAs($user)->putJson("/api/v1/employees/{$employee->id}", ['weekend_day' => null])
+        ->assertOk()
+        ->assertJsonPath('data.weekend_day', null);
+    expect($employee->fresh()->weekend_day)->toBeNull();
+});
+
+test('weekly-offs bulk assign sets the weekend day for every in-scope employee', function () {
+    $a = Employee::factory()->create();
+    $b = Employee::factory()->create();
+    $user = userWithPermission(PermissionName::EmployeeUpdate);
+
+    $response = $this->actingAs($user)->patchJson('/api/v1/employees/weekly-offs', [
+        'employee_ids' => [$a->id, $b->id],
+        'weekend_day' => 'sunday',
+    ]);
+
+    $response->assertOk();
+    expect($a->fresh()->weekend_day->value)->toBe('sunday')
+        ->and($b->fresh()->weekend_day->value)->toBe('sunday');
+});
+
+test('weekly-offs bulk assign skips employees outside the caller scope', function () {
+    $team = Team::factory()->create();
+    $inScope = Employee::factory()->create();
+    TeamMember::factory()->create(['team_id' => $team->id, 'employee_id' => $inScope->id]);
+    $outsider = Employee::factory()->create();
+    $user = userWithPermission(PermissionName::EmployeeUpdate, Scope::Team, $team->id);
+
+    $response = $this->actingAs($user)->patchJson('/api/v1/employees/weekly-offs', [
+        'employee_ids' => [$inScope->id, $outsider->id],
+        'weekend_day' => 'friday',
+    ]);
+
+    $response->assertOk();
+    expect($inScope->fresh()->weekend_day?->value)->toBe('friday')
+        ->and($outsider->fresh()->weekend_day)->toBeNull();
+});
+
+test('weekly-offs bulk assign needs employee.update', function () {
+    $employee = Employee::factory()->create();
+    $user = userWithPermission(PermissionName::EmployeeView);
+
+    $this->actingAs($user)->patchJson('/api/v1/employees/weekly-offs', [
+        'employee_ids' => [$employee->id],
+        'weekend_day' => 'friday',
+    ])->assertStatus(403);
+});
+
 test('updating status writes a status history entry', function () {
     $employee = Employee::factory()->create(['status' => EmployeeStatus::Probation]);
     $user = userWithPermission(PermissionName::EmployeeUpdate);

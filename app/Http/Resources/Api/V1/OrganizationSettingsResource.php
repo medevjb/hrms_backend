@@ -21,6 +21,7 @@ class OrganizationSettingsResource extends JsonResource
             'currency' => $this->currency,
             'currency_decimal_places' => $this->currency_decimal_places,
             'weekend_days' => $this->weekend_days,
+            'default_weekend_day' => $this->default_weekend_day?->value,
             'default_shift_id' => $this->default_shift_id,
         ];
     }

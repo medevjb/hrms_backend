@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\Weekday;
+use App\Models\Employee;
 use App\Models\OrganizationSettings;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -12,7 +14,8 @@ test('current() creates the singleton row with its defaults on first access', fu
     expect(OrganizationSettings::query()->count())->toBe(1);
     expect($settings->late_grace_minutes)->toBe(10);
     expect($settings->hourly_overtime_enabled)->toBeFalse();
-    expect($settings->weekend_days)->toBe(['saturday', 'sunday']);
+    expect($settings->default_weekend_day)->toBe(Weekday::Friday);
+    expect($settings->weekend_days)->toBe(['friday']);
 });
 
 test('current() returns the same row on repeated calls, not a new one each time', function () {
@@ -30,12 +33,33 @@ test('saving invalidates the cache so the next current() reflects the change', f
     expect(OrganizationSettings::current()->late_grace_minutes)->toBe(20);
 });
 
-test('isWeekend checks the configured weekend_days, not a hard-coded day', function () {
+test('isWeekend checks the configured default_weekend_day, not a hard-coded day', function () {
     $settings = OrganizationSettings::current();
-    $settings->update(['weekend_days' => ['friday']]);
+    $settings->update(['default_weekend_day' => Weekday::Friday]);
 
     expect($settings->isWeekend(Carbon::parse('2026-08-28')))->toBeTrue(); // a Friday
     expect($settings->isWeekend(Carbon::parse('2026-08-29')))->toBeFalse(); // a Saturday
+});
+
+test('setting default_weekend_day keeps the legacy weekend_days list in sync', function () {
+    $settings = OrganizationSettings::current();
+    $settings->update(['default_weekend_day' => Weekday::Sunday]);
+
+    expect($settings->fresh()->weekend_days)->toBe(['sunday']);
+});
+
+test('an employee weekend_day overrides the organization default', function () {
+    $settings = OrganizationSettings::current();
+    $settings->update(['default_weekend_day' => Weekday::Friday]);
+
+    $employee = Employee::factory()->create(['weekend_day' => Weekday::Monday]);
+
+    // Friday is the org default but not this employee's day.
+    expect($settings->isWeekend(Carbon::parse('2026-08-28'), $employee))->toBeFalse();
+    // Monday is their day.
+    expect($settings->isWeekend(Carbon::parse('2026-08-31'), $employee))->toBeTrue();
+    // With no employee, the org default still applies.
+    expect($settings->isWeekend(Carbon::parse('2026-08-28')))->toBeTrue();
 });
 
 test('current() caches raw attributes, not a serialized model object, so a stale/incompatible cached model can never break it', function () {

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api\V1\Employees;
 
 use App\Enums\EmploymentType;
+use App\Enums\Weekday;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -33,6 +34,7 @@ class CreateEmployeeRequest extends FormRequest
             'confirmation_date' => ['nullable', 'date', 'after:joining_date'],
             'office_location' => ['nullable', 'string', 'max:100'],
             'timezone' => ['nullable', 'string', 'max:100'],
+            'weekend_day' => ['nullable', Rule::enum(Weekday::class)],
             'overtime_eligible' => ['nullable', 'boolean'],
         ];
     }

@@ -65,6 +65,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('employees', [EmployeeController::class, 'index'])->name('employees.index');
     Route::post('employees', [EmployeeController::class, 'store'])->name('employees.store');
+    Route::patch('employees/weekly-offs', [EmployeeController::class, 'assignWeeklyOff'])
+        ->name('employees.weekly-offs.update');
     Route::get('employees/{employee}', [EmployeeController::class, 'show'])->name('employees.show');
     Route::get('employees/{employee}/photo', [EmployeeController::class, 'photo'])->name('employees.photo');
     Route::put('employees/{employee}', [EmployeeController::class, 'update'])->name('employees.update');

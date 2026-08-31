@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\EmployeeStatus;
 use App\Enums\EmploymentType;
+use App\Enums\Weekday;
 use Database\Factories\EmployeeFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -35,13 +36,14 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $confirmation_date
  * @property string|null $office_location
  * @property string|null $timezone
+ * @property Weekday|null $weekend_day
  * @property bool $overtime_eligible
  */
 #[Fillable([
     'user_id', 'employee_code', 'first_name', 'last_name', 'profile_image_path',
     'phone', 'address', 'emergency_contact_name', 'emergency_contact_phone',
     'joining_date', 'designation', 'employment_type', 'status', 'confirmation_date',
-    'office_location', 'timezone', 'overtime_eligible',
+    'office_location', 'timezone', 'weekend_day', 'overtime_eligible',
 ])]
 class Employee extends Model
 {
@@ -55,6 +57,7 @@ class Employee extends Model
             'confirmation_date' => 'date',
             'employment_type' => EmploymentType::class,
             'status' => EmployeeStatus::class,
+            'weekend_day' => Weekday::class,
             'overtime_eligible' => 'boolean',
         ];
     }

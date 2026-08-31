@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Api\V1\Settings;
 
+use App\Enums\Weekday;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateOrganizationSettingsRequest extends FormRequest
 {
@@ -24,6 +26,7 @@ class UpdateOrganizationSettingsRequest extends FormRequest
             'currency_decimal_places' => ['sometimes', 'integer', 'min:0', 'max:4'],
             'weekend_days' => ['sometimes', 'array', 'min:0', 'max:7'],
             'weekend_days.*' => ['string', 'in:monday,tuesday,wednesday,thursday,friday,saturday,sunday'],
+            'default_weekend_day' => ['sometimes', Rule::enum(Weekday::class)],
             'default_shift_id' => ['sometimes', 'nullable', 'integer', 'exists:shifts,id'],
         ];
     }

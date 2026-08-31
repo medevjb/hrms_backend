@@ -43,6 +43,27 @@ test('a user with settings.manage can read and update organization settings', fu
     $response->assertJsonPath('data.weekend_days', ['friday', 'saturday']);
 });
 
+test('setting default_weekend_day updates the single weekly off day and keeps weekend_days in sync', function () {
+    $user = userWithSettingsPermission(PermissionName::SettingsManage);
+
+    $response = $this->actingAs($user)->putJson('/api/v1/settings/organization', [
+        'default_weekend_day' => 'sunday',
+    ]);
+
+    $response->assertOk();
+    $response->assertJsonPath('data.default_weekend_day', 'sunday');
+    $response->assertJsonPath('data.weekend_days', ['sunday']);
+    expect(OrganizationSettings::current()->default_weekend_day->value)->toBe('sunday');
+});
+
+test('an invalid weekday is rejected for default_weekend_day', function () {
+    $user = userWithSettingsPermission(PermissionName::SettingsManage);
+
+    $this->actingAs($user)->putJson('/api/v1/settings/organization', [
+        'default_weekend_day' => 'someday',
+    ])->assertStatus(422);
+});
+
 test('attendance.settings.manage is a distinct permission from settings.manage', function () {
     $user = userWithSettingsPermission(PermissionName::SettingsManage);
 

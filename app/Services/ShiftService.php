@@ -28,7 +28,7 @@ class ShiftService
         // the organization timezone is authoritative for attendance).
         $workDate = Carbon::parse($date->toDateString(), $settings->timezone);
 
-        $isWeekend = $settings->isWeekend($workDate);
+        $isWeekend = $settings->isWeekend($workDate, $employee);
         $isHoliday = Holiday::query()
             ->where('date', $workDate->toDateString())
             ->where('active', true)

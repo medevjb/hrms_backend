@@ -43,6 +43,7 @@ class ProfileResource extends JsonResource
                 'confirmation_date' => $employee->confirmation_date?->toDateString(),
                 'office_location' => $employee->office_location,
                 'timezone' => $employee->timezone,
+                'weekend_day' => $employee->weekend_day?->value,
                 'overtime_eligible' => $employee->overtime_eligible,
                 'department' => $department === null ? null : [
                     'id' => $department->id,

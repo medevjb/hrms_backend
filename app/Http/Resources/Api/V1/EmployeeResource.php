@@ -38,6 +38,7 @@ class EmployeeResource extends JsonResource
             'confirmation_date' => $this->confirmation_date?->toDateString(),
             'office_location' => $this->office_location,
             'timezone' => $this->timezone,
+            'weekend_day' => $this->weekend_day?->value,
             'overtime_eligible' => $this->overtime_eligible,
             'department' => $team?->department ? [
                 'id' => $team->department->id,

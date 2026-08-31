@@ -6,6 +6,7 @@ use App\Enums\MissingCheckoutPolicy;
 use App\Enums\OvertimeDailySalaryBasis;
 use App\Enums\OvertimeHourlyRateMode;
 use App\Enums\SalaryDayCalculationMethod;
+use App\Enums\Weekday;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -25,6 +26,7 @@ use Illuminate\Support\Facades\Cache;
  * @property int $currency_decimal_places
  * @property int $late_grace_minutes
  * @property array<int, string> $weekend_days
+ * @property Weekday|null $default_weekend_day
  * @property int|null $default_shift_id
  * @property int|null $payroll_cutoff_day
  * @property SalaryDayCalculationMethod $salary_day_calculation_method
@@ -46,7 +48,7 @@ use Illuminate\Support\Facades\Cache;
  */
 #[Fillable([
     'company_name', 'company_logo_path', 'timezone', 'currency', 'currency_decimal_places',
-    'late_grace_minutes', 'weekend_days', 'default_shift_id',
+    'late_grace_minutes', 'weekend_days', 'default_weekend_day', 'default_shift_id',
     'payroll_cutoff_day', 'salary_day_calculation_method',
     'overtime_enabled', 'weekend_overtime_enabled', 'holiday_overtime_enabled',
     'hourly_overtime_enabled', 'overtime_full_day_minutes', 'overtime_daily_salary_basis',
@@ -71,6 +73,7 @@ class OrganizationSettings extends Model
         'currency' => 'USD',
         'currency_decimal_places' => 2,
         'late_grace_minutes' => 10,
+        'default_weekend_day' => 'friday',
         'salary_day_calculation_method' => 'FIXED_30_DAYS',
         'overtime_enabled' => true,
         'weekend_overtime_enabled' => true,
@@ -90,6 +93,7 @@ class OrganizationSettings extends Model
     {
         return [
             'weekend_days' => 'array',
+            'default_weekend_day' => Weekday::class,
             'overtime_enabled' => 'boolean',
             'weekend_overtime_enabled' => 'boolean',
             'holiday_overtime_enabled' => 'boolean',
@@ -133,7 +137,8 @@ class OrganizationSettings extends Model
             self::CACHE_KEY,
             fn () => (static::query()->first() ?? static::query()->create([
                 'timezone' => 'Asia/Dhaka', // §142 — authoritative for attendance
-                'weekend_days' => ['saturday', 'sunday'],
+                'weekend_days' => ['friday'],
+                'default_weekend_day' => 'friday', // §85 — one weekly off day
                 'late_grace_minutes' => 10, // docs/PRD.md §101 default
                 'hourly_overtime_enabled' => false, // §47 — OFF by default
             ]))->getAttributes(),
@@ -144,11 +149,33 @@ class OrganizationSettings extends Model
 
     protected static function booted(): void
     {
+        // §85's weekly off is one day now (docs/PRD.md §5683). `weekend_days`
+        // stays as the stored list every reader already consults; the single
+        // `default_weekend_day` accessor is kept in lockstep with it both
+        // ways so writing either keeps the other honest.
+        static::saving(function (self $settings): void {
+            if ($settings->isDirty('default_weekend_day') && $settings->default_weekend_day !== null) {
+                $settings->weekend_days = [$settings->default_weekend_day->value];
+            } elseif ($settings->isDirty('weekend_days') && count($settings->weekend_days ?? []) === 1) {
+                $settings->default_weekend_day = Weekday::tryFrom($settings->weekend_days[0]);
+            }
+        });
+
         static::saved(fn () => Cache::forget(self::CACHE_KEY));
     }
 
-    public function isWeekend(Carbon $date): bool
+    /**
+     * Is `$date` a weekly off day? The employee's own weekend day wins when
+     * they have one; otherwise the organization weekend applies (docs/PRD.md
+     * §85, §5683). The resolver signature is "(employee, date)" so nothing
+     * downstream needs to know where the answer came from.
+     */
+    public function isWeekend(Carbon $date, ?Employee $employee = null): bool
     {
+        if ($employee?->weekend_day !== null) {
+            return $employee->weekend_day->matches($date);
+        }
+
         return in_array(strtolower($date->englishDayOfWeek), $this->weekend_days, true);
     }
 }

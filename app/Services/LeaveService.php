@@ -32,8 +32,12 @@ class LeaveService
      * is always exactly 0.5 regardless of span, since §138 only supports a
      * half-day request against a single work day.
      */
-    public function estimateDays(CarbonInterface $startDate, CarbonInterface $endDate, bool $isHalfDay): float
-    {
+    public function estimateDays(
+        CarbonInterface $startDate,
+        CarbonInterface $endDate,
+        bool $isHalfDay,
+        ?Employee $employee = null,
+    ): float {
         if ($isHalfDay) {
             return 0.5;
         }
@@ -48,7 +52,7 @@ class LeaveService
         $cursor = Carbon::parse($startDate->toDateString());
 
         while ($cursor->lessThanOrEqualTo($endDate)) {
-            $isWeekend = $settings->isWeekend($cursor);
+            $isWeekend = $settings->isWeekend($cursor, $employee);
             $isHoliday = Holiday::query()->where('date', $cursor->toDateString())->where('active', true)->exists();
 
             if (! $isWeekend && ! $isHoliday) {
@@ -86,7 +90,7 @@ class LeaveService
             throw ValidationException::withMessages(['leave_type_id' => ["{$leaveType->name} is not yet available — it unlocks after {$leaveType->min_employment_days} days of employment."]]);
         }
 
-        $daysRequested = $this->estimateDays($startDate, $endDate, $isHalfDay);
+        $daysRequested = $this->estimateDays($startDate, $endDate, $isHalfDay, $employee);
 
         if ($daysRequested <= 0) {
             throw ValidationException::withMessages(['start_date' => ['This date range contains no working days.']]);
@@ -273,7 +277,7 @@ class LeaveService
 
         $futureStart = $request->start_date->greaterThanOrEqualTo($today) ? $request->start_date : $today;
 
-        return $this->estimateDays($futureStart, $request->end_date, false);
+        return $this->estimateDays($futureStart, $request->end_date, false, $request->employee);
     }
 
     private function assertNoOverlap(Employee $employee, CarbonInterface $startDate, CarbonInterface $endDate): void

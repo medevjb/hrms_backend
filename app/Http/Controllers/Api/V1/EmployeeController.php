@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\EmployeeStatus;
 use App\Enums\PermissionName;
+use App\Enums\Weekday;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Employees\AssignShiftRequest;
 use App\Http\Requests\Api\V1\Employees\CreateEmployeeRequest;
@@ -22,6 +23,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EmployeeController extends Controller
@@ -97,6 +99,14 @@ class EmployeeController extends Controller
 
         if ($request->has('filter.overtime_eligible')) {
             $query->where('overtime_eligible', $request->boolean('filter.overtime_eligible'));
+        }
+
+        if ($weekendDay = $request->input('filter.weekend_day')) {
+            // "default" targets everyone still on the organization default —
+            // i.e. no per-employee override set.
+            $weekendDay === 'default'
+                ? $query->whereNull('weekend_day')
+                : $query->where('weekend_day', $weekendDay);
         }
 
         if ($request->boolean('filter.unassigned')) {
@@ -185,6 +195,40 @@ class EmployeeController extends Controller
         $employee->update($request->validated());
 
         return ApiResponse::data(new EmployeeResource($employee->fresh(self::EAGER_LOAD)));
+    }
+
+    /**
+     * Bulk-assign a weekly off day across a selection of employees — the
+     * management view for §85's per-employee weekend override. A null
+     * weekend_day puts those employees back on the organization default.
+     * Every id is scope-checked; ids outside the caller's scope are
+     * silently skipped (404 semantics, never 403 — docs/api.md).
+     */
+    public function assignWeeklyOff(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->hasPermission(PermissionName::EmployeeUpdate), 403);
+
+        $validated = $request->validate([
+            'employee_ids' => ['required', 'array', 'min:1'],
+            'employee_ids.*' => ['integer'],
+            'weekend_day' => ['present', 'nullable', Rule::enum(Weekday::class)],
+        ]);
+
+        $allowedIds = $this->scopeResolver->employeeIdsFor($request->user(), PermissionName::EmployeeUpdate);
+
+        $targets = Employee::query()
+            ->whereIn('id', $validated['employee_ids'])
+            ->when($allowedIds !== null, fn ($q) => $q->whereIn('id', $allowedIds))
+            ->get()
+            ->filter(fn (Employee $employee) => Gate::allows('update', $employee));
+
+        foreach ($targets as $employee) {
+            $employee->update(['weekend_day' => $validated['weekend_day']]);
+        }
+
+        return ApiResponse::data([
+            'updated' => $targets->pluck('id')->values(),
+        ]);
     }
 
     public function destroy(Employee $employee, EmployeeService $employees): Response
