@@ -24,6 +24,9 @@ class EmployeeResource extends JsonResource
             'full_name' => $this->fullName(),
             'email' => $this->user->email,
             'profile_image_path' => $this->profile_image_path,
+            'photo_url' => $this->profile_image_path
+                ? "/employees/{$this->id}/photo?v=".($this->updated_at?->timestamp ?? 0)
+                : null,
             'phone' => $this->phone,
             'address' => $this->address,
             'emergency_contact_name' => $this->emergency_contact_name,
