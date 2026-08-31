@@ -18,7 +18,7 @@ return new class extends Migration
 
             $table->string('company_name')->default('Agency HRM');
             $table->string('company_logo_path')->nullable();
-            $table->string('timezone')->default('UTC'); // §142 — authoritative for attendance
+            $table->string('timezone')->default('Asia/Dhaka'); // §142 — authoritative for attendance
             $table->string('currency')->default('USD');
             $table->unsignedTinyInteger('currency_decimal_places')->default(2);
 

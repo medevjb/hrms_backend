@@ -67,7 +67,7 @@ class OrganizationSettings extends Model
      */
     protected $attributes = [
         'company_name' => 'Agency HRM',
-        'timezone' => 'UTC',
+        'timezone' => 'Asia/Dhaka',
         'currency' => 'USD',
         'currency_decimal_places' => 2,
         'late_grace_minutes' => 10,
@@ -132,6 +132,7 @@ class OrganizationSettings extends Model
         $attributes = Cache::rememberForever(
             self::CACHE_KEY,
             fn () => (static::query()->first() ?? static::query()->create([
+                'timezone' => 'Asia/Dhaka', // §142 — authoritative for attendance
                 'weekend_days' => ['saturday', 'sunday'],
                 'late_grace_minutes' => 10, // docs/PRD.md §101 default
                 'hourly_overtime_enabled' => false, // §47 — OFF by default

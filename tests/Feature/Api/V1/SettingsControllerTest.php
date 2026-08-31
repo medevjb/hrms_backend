@@ -29,16 +29,16 @@ test('a user with settings.manage can read and update organization settings', fu
 
     $this->actingAs($user)->getJson('/api/v1/settings/organization')
         ->assertOk()
-        ->assertJsonPath('data.timezone', 'UTC');
+        ->assertJsonPath('data.timezone', 'Asia/Dhaka');
 
     $response = $this->actingAs($user)->putJson('/api/v1/settings/organization', [
-        'timezone' => 'Asia/Dhaka',
+        'timezone' => 'Asia/Karachi',
         'currency' => 'BDT',
         'weekend_days' => ['friday', 'saturday'],
     ]);
 
     $response->assertOk();
-    $response->assertJsonPath('data.timezone', 'Asia/Dhaka');
+    $response->assertJsonPath('data.timezone', 'Asia/Karachi');
     $response->assertJsonPath('data.currency', 'BDT');
     $response->assertJsonPath('data.weekend_days', ['friday', 'saturday']);
 });
