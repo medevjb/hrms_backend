@@ -11,7 +11,6 @@ use App\Models\User;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -94,6 +93,10 @@ class ProfileController extends Controller
 
     private function withRelations(User $user): User
     {
-        return $user->load('employee.currentTeamMembership.team.department');
+        return $user->load([
+            'employee.currentTeamMembership.team.department.operationManager',
+            'employee.currentTeamMembership.team.teamLeader',
+            'employee.currentShiftAssignment.shift',
+        ]);
     }
 }

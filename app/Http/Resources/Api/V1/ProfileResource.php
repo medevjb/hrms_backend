@@ -7,9 +7,10 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * The signed-in user's own record for the personal settings screen — their
- * editable name/contact fields, plus the read-only employment context HR
- * owns. Distinct from UserResource (roles/permissions for the shell).
+ * The signed-in user's own record for the personal profile screen. Carries
+ * everything about them that isn't confidential — the contact fields they
+ * edit, plus all the employment context HR owns, read-only. Deliberately
+ * omits salary, payroll, and documents (§82, §11 — employee.financial.*).
  *
  * @mixin User
  */
@@ -23,6 +24,8 @@ class ProfileResource extends JsonResource
         $employee = $this->employee;
         $team = $employee?->currentTeamMembership?->team;
         $department = $team?->department;
+        $leader = $team?->teamLeader;
+        $manager = $department?->operationManager;
 
         return [
             'name' => $this->name,
@@ -37,6 +40,10 @@ class ProfileResource extends JsonResource
                 'employment_type' => $employee->employment_type,
                 'status' => $employee->status,
                 'joining_date' => $employee->joining_date->toDateString(),
+                'confirmation_date' => $employee->confirmation_date?->toDateString(),
+                'office_location' => $employee->office_location,
+                'timezone' => $employee->timezone,
+                'overtime_eligible' => $employee->overtime_eligible,
                 'department' => $department === null ? null : [
                     'id' => $department->id,
                     'name' => $department->name,
@@ -44,6 +51,18 @@ class ProfileResource extends JsonResource
                 'team' => $team === null ? null : [
                     'id' => $team->id,
                     'name' => $team->name,
+                ],
+                'current_shift' => $employee->currentShiftAssignment?->shift ? [
+                    'id' => $employee->currentShiftAssignment->shift->id,
+                    'name' => $employee->currentShiftAssignment->shift->name,
+                ] : null,
+                'team_leader' => $leader === null ? null : [
+                    'id' => $leader->id,
+                    'full_name' => $leader->fullName(),
+                ],
+                'operation_manager' => $manager === null ? null : [
+                    'id' => $manager->id,
+                    'full_name' => $manager->fullName(),
                 ],
                 'phone' => $employee->phone,
                 'address' => $employee->address,
