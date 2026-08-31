@@ -35,4 +35,8 @@ enum AuditAction: string
     case ReportExported = 'REPORT_EXPORTED';
     case DocumentDownloaded = 'DOCUMENT_DOWNLOADED';
     case HolidayNoticeApproved = 'HOLIDAY_NOTICE_APPROVED';
+
+    // docs/PRD.md §79 — operator actions from the DevOps console's Queue page.
+    case QueueJobRetried = 'QUEUE_JOB_RETRIED';
+    case QueueJobForgotten = 'QUEUE_JOB_FORGOTTEN';
 }

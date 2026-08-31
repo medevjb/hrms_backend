@@ -7,10 +7,15 @@ test('guests are redirected to the login page', function () {
     $response->assertRedirect(route('login'));
 });
 
-test('authenticated users can visit the dashboard', function () {
-    $user = User::factory()->create();
-    $this->actingAs($user);
+test('a signed-in user without system.health.view cannot visit the console', function () {
+    $this->actingAs(User::factory()->create());
 
-    $response = $this->get(route('dashboard'));
-    $response->assertOk();
+    // docs/PRD.md §79 — the /system console is gated on `system.health.view`.
+    $this->get(route('dashboard'))->assertForbidden();
+});
+
+test('a user holding system.health.view can visit the console', function () {
+    $this->actingAs(systemConsoleUser());
+
+    $this->get(route('dashboard'))->assertOk();
 });

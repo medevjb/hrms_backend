@@ -5,6 +5,7 @@ namespace App\Http\Resources\Api\V1;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Carbon;
 
 /**
  * The signed-in user's own record for the personal profile screen. Carries
@@ -60,6 +61,12 @@ class ProfileResource extends JsonResource
                 'current_shift' => $employee->currentShiftAssignment?->shift ? [
                     'id' => $employee->currentShiftAssignment->shift->id,
                     'name' => $employee->currentShiftAssignment->shift->name,
+                    'break_start' => $employee->currentShiftAssignment->shift->break_start
+                        ? Carbon::parse($employee->currentShiftAssignment->shift->break_start)->format('H:i')
+                        : null,
+                    'break_end' => $employee->currentShiftAssignment->shift->break_end
+                        ? Carbon::parse($employee->currentShiftAssignment->shift->break_end)->format('H:i')
+                        : null,
                 ] : null,
                 'team_leader' => $leader === null ? null : [
                     'id' => $leader->id,

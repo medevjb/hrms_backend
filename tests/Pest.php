@@ -1,5 +1,11 @@
 <?php
 
+use App\Enums\PermissionName;
+use App\Enums\Scope;
+use App\Models\Permission;
+use App\Models\Role;
+use App\Models\User;
+use App\Models\UserRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -47,4 +53,29 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * A verified user holding the given permissions through one System-scoped role.
+ * Defaults to `system.health.view` — the gate on the whole /system console.
+ */
+function systemConsoleUser(string ...$permissions): User
+{
+    $permissions = $permissions ?: [PermissionName::SystemHealthView->value];
+
+    $user = User::factory()->create();
+    $role = Role::query()->firstOrCreate(['name' => 'System '.fake()->unique()->word()]);
+
+    foreach ($permissions as $permission) {
+        $perm = Permission::query()->firstOrCreate(['name' => $permission]);
+        $role->permissions()->syncWithoutDetaching([$perm->id]);
+    }
+
+    UserRole::factory()->create([
+        'user_id' => $user->id,
+        'role_id' => $role->id,
+        'scope' => Scope::System,
+    ]);
+
+    return $user;
 }

@@ -63,6 +63,48 @@ test('updating a shift', function () {
     $response->assertJsonPath('data.name', 'Renamed');
 });
 
+test('a shift can carry a break window, and break_minutes is derived from it', function () {
+    $user = userWithShiftPermission(PermissionName::ShiftManage);
+
+    $response = $this->actingAs($user)->postJson('/api/v1/shifts', [
+        'name' => 'Day with lunch',
+        'start_time' => '09:00',
+        'end_time' => '18:00',
+        'expected_work_minutes' => 480,
+        'break_minutes' => 5, // ignored — the window wins
+        'break_start' => '13:00',
+        'break_end' => '13:45',
+    ]);
+
+    $response->assertStatus(201);
+    $response->assertJsonPath('data.break_start', '13:00');
+    $response->assertJsonPath('data.break_end', '13:45');
+    $response->assertJsonPath('data.break_minutes', 45);
+});
+
+test('the break window end must be after the start', function () {
+    $user = userWithShiftPermission(PermissionName::ShiftManage);
+
+    $this->actingAs($user)->postJson('/api/v1/shifts', [
+        'name' => 'Backwards break',
+        'start_time' => '09:00',
+        'end_time' => '18:00',
+        'expected_work_minutes' => 480,
+        'break_start' => '14:00',
+        'break_end' => '13:00',
+    ])->assertStatus(422)->assertJsonValidationErrors(['break_end']);
+});
+
+test('clearing the break window is allowed', function () {
+    $shift = Shift::factory()->create(['break_start' => '13:00', 'break_end' => '13:30']);
+    $user = userWithShiftPermission(PermissionName::ShiftManage);
+
+    $this->actingAs($user)->putJson("/api/v1/shifts/{$shift->id}", [
+        'break_start' => null,
+        'break_end' => null,
+    ])->assertOk()->assertJsonPath('data.break_start', null);
+});
+
 test('shift start_time and end_time must be H:i formatted', function () {
     $user = userWithShiftPermission(PermissionName::ShiftManage);
 

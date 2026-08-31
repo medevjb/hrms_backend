@@ -4184,6 +4184,15 @@ Admin/DevOps belongs to the `/system` Inertia console (Phase 12), not this front
 360 backend tests pass (5 new: `DashboardControllerTest`), 2 pre-existing Fortify skips;
 `phpstan` / `pint` clean; frontend typecheck / lint / build clean.
 
+**Payload additions (role-aware-dashboard change, 2026-08-31).** All additive, same
+gating/scoping model: `me.next_approved_leave` (nearest future HR-approved request, or
+null); each `me.leave_balances[]` item gains `entitlement` (from the leave type) and an
+approximate `taken` (`max(0, entitlement − balance)`); `attendance_today` gains
+`on_leave_today` / `on_leave_upcoming` lists (scoped like the counts); `workforce` gains
+`by_department: [{ id, name, headcount }]`; new `people_movement` widget (recent joiners
+/ exits over 30 days, gated by `employee.view`, scoped). Frontend consumes these across
+the split Self / Manage dashboards (see §8 role-aware entry).
+
 **Dependency:** Phase 9.
 
 ---

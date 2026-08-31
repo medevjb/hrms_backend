@@ -31,3 +31,7 @@ Schedule::command('holidays:scan-notices')->dailyAt('06:00');
 // arrived and expires ones past their expires_at. Hourly so a scheduled
 // publish lands close to its intended time.
 Schedule::command('announcements:publish-due')->hourly();
+
+// docs/PRD.md §79 — keeps the scheduled-task run history bounded and
+// reclassifies runs abandoned by a killed process.
+Schedule::command('system:prune-schedule-runs')->dailyAt('03:30');

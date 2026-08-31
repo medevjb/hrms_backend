@@ -5,6 +5,7 @@ namespace App\Http\Resources\Api\V1;
 use App\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Carbon;
 
 /** @mixin Employee */
 class EmployeeResource extends JsonResource
@@ -48,6 +49,12 @@ class EmployeeResource extends JsonResource
             'current_shift' => $this->currentShiftAssignment?->shift ? [
                 'id' => $this->currentShiftAssignment->shift->id,
                 'name' => $this->currentShiftAssignment->shift->name,
+                'break_start' => $this->currentShiftAssignment->shift->break_start
+                    ? Carbon::parse($this->currentShiftAssignment->shift->break_start)->format('H:i')
+                    : null,
+                'break_end' => $this->currentShiftAssignment->shift->break_end
+                    ? Carbon::parse($this->currentShiftAssignment->shift->break_end)->format('H:i')
+                    : null,
             ] : null,
             'team_leader' => $team?->teamLeader ? [
                 'id' => $team->teamLeader->id,

@@ -21,6 +21,22 @@ use Illuminate\Database\Seeder;
  */
 class RolePermissionSeeder extends Seeder
 {
+    /**
+     * One-line summary of each role's remit (docs/PRD.md §8). Shown on the
+     * read-only roles reference screen; not used for any authorization.
+     *
+     * @var array<string, string>
+     */
+    private const ROLE_DESCRIPTIONS = [
+        'Admin' => 'Full control of the system — every permission, at every scope.',
+        'Head of HR' => 'Owns the HR function: people, payroll, leave and attendance policy, and org settings.',
+        'HR' => 'Day-to-day HR operations — onboarding, attendance, leave and payroll preparation.',
+        'Operation Manager' => 'Runs an operational chain: reviews and approves leave and overtime for the teams beneath them.',
+        'Team Leader' => 'Leads a team: reviews and approves their members\' leave and overtime, sees team attendance.',
+        'Team Member' => 'An individual employee — own attendance, leave requests, payslips and announcements.',
+        'System Admin / DevOps' => 'Technical operator: system health and audit visibility only, no employee data.',
+    ];
+
     /** @var array<string, list<PermissionName>> */
     private const ROLE_PERMISSIONS = [
         'Head of HR' => [
@@ -166,11 +182,17 @@ class RolePermissionSeeder extends Seeder
 
         // Admin holds every permission — spelling that out case-by-case above
         // would just be the full enum list with extra steps.
-        $adminRole = Role::query()->firstOrCreate(['name' => 'Admin']);
+        $adminRole = Role::query()->updateOrCreate(
+            ['name' => 'Admin'],
+            ['description' => self::ROLE_DESCRIPTIONS['Admin']],
+        );
         $adminRole->permissions()->sync($permissionsByName->pluck('id'));
 
         foreach (self::ROLE_PERMISSIONS as $roleName => $permissions) {
-            $role = Role::query()->firstOrCreate(['name' => $roleName]);
+            $role = Role::query()->updateOrCreate(
+                ['name' => $roleName],
+                ['description' => self::ROLE_DESCRIPTIONS[$roleName]],
+            );
 
             $permissionIds = collect($permissions)
                 ->map(fn (PermissionName $permission) => $permissionsByName[$permission->value]->id);

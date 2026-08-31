@@ -24,6 +24,7 @@ use App\Models\PayrollDispute;
 use App\Models\PayrollEntry;
 use App\Models\PayrollPeriod;
 use App\Models\Team;
+use App\Models\TeamMember;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 
@@ -48,7 +49,7 @@ class DashboardService
         $widgets = [];
 
         if ($user->employee !== null) {
-            $widgets['me'] = $this->me($user->employee, $today);
+            $widgets['me'] = $this->me($user->employee, $today, $settings);
         }
 
         if ($this->can($user, PermissionName::AttendanceView)) {
@@ -62,6 +63,7 @@ class DashboardService
 
         if ($this->can($user, PermissionName::EmployeeView)) {
             $widgets['workforce'] = $this->workforce();
+            $widgets['people_movement'] = $this->peopleMovement($user);
         }
 
         if ($this->can($user, PermissionName::PayrollView)) {
@@ -86,8 +88,15 @@ class DashboardService
     /**
      * @return array<string, mixed>
      */
-    private function me(Employee $employee, string $today): array
+    private function me(Employee $employee, string $today, OrganizationSettings $settings): array
     {
+        // §85 — the employee's own weekly off wins; otherwise the org
+        // weekend applies. The calendar needs this to shade days that have
+        // no attendance record yet.
+        $weekendDays = $employee->weekend_day !== null
+            ? [$employee->weekend_day->value]
+            : $settings->weekend_days;
+
         $todayRecord = AttendanceRecord::query()
             ->where('employee_id', $employee->id)
             ->whereDate('work_date', $today)
@@ -96,10 +105,28 @@ class DashboardService
         $leaveBalances = $employee->leaveBalances()
             ->with('leaveType')
             ->get()
-            ->map(fn ($balance) => [
-                'leave_type' => $balance->leaveType->name,
-                'balance' => (float) $balance->balance,
-            ]);
+            ->map(function ($balance) {
+                $entitlement = (float) $balance->leaveType->annual_allocation_days;
+
+                return [
+                    'leave_type' => $balance->leaveType->name,
+                    'balance' => (float) $balance->balance,
+                    'entitlement' => $entitlement,
+                    // Approximation: entitlement minus what's left. Ignores
+                    // carry-forward and manual adjustments, but keeps this to
+                    // one query instead of replaying each balance's ledger —
+                    // accurate enough for a dashboard progress bar.
+                    'taken' => max(0.0, $entitlement - (float) $balance->balance),
+                ];
+            });
+
+        $nextApprovedLeave = LeaveRequest::query()
+            ->where('employee_id', $employee->id)
+            ->where('status', LeaveStatus::HrApproved)
+            ->whereDate('start_date', '>=', $today)
+            ->orderBy('start_date')
+            ->with('leaveType')
+            ->first();
 
         return [
             'today' => $todayRecord ? [
@@ -109,6 +136,13 @@ class DashboardService
                 'worked_minutes' => $todayRecord->worked_minutes,
             ] : null,
             'leave_balances' => $leaveBalances,
+            'weekend_days' => array_values($weekendDays),
+            'next_approved_leave' => $nextApprovedLeave ? [
+                'leave_type' => $nextApprovedLeave->leaveType->name,
+                'start_date' => $nextApprovedLeave->start_date->toDateString(),
+                'end_date' => $nextApprovedLeave->end_date->toDateString(),
+                'days_requested' => (float) $nextApprovedLeave->days_requested,
+            ] : null,
             'pending_leave' => LeaveRequest::query()
                 ->where('employee_id', $employee->id)
                 ->whereIn('status', [LeaveStatus::Submitted, LeaveStatus::TeamLeaderApproved, LeaveStatus::OperationManagerApproved])
@@ -126,7 +160,7 @@ class DashboardService
     }
 
     /**
-     * @return array<string, int>
+     * @return array<string, mixed>
      */
     private function attendanceToday(User $user, string $today): array
     {
@@ -139,13 +173,47 @@ class DashboardService
 
         $byStatus = $query->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
 
+        $weekAhead = Carbon::parse($today)->addDay()->toDateString();
+        $weekEnd = Carbon::parse($today)->addDays(7)->toDateString();
+
         return [
             'present' => (int) ($byStatus[AttendanceStatus::Present->value] ?? 0),
             'late' => (int) ($byStatus[AttendanceStatus::Late->value] ?? 0),
             'absent' => (int) ($byStatus[AttendanceStatus::Absent->value] ?? 0),
             'on_leave' => (int) ($byStatus[AttendanceStatus::OnLeave->value] ?? 0),
             'missing_checkout' => (int) ($byStatus[AttendanceStatus::MissingCheckout->value] ?? 0),
+            'on_leave_today' => $this->onLeaveBetween($ids, $today, $today),
+            'on_leave_upcoming' => $this->onLeaveBetween($ids, $weekAhead, $weekEnd),
         ];
+    }
+
+    /**
+     * Approved leave overlapping [$from, $to], scoped to $ids (null = all).
+     *
+     * @param  list<int>|null  $ids
+     * @return array<int, array<string, mixed>>
+     */
+    private function onLeaveBetween(?array $ids, string $from, string $to): array
+    {
+        $query = LeaveRequest::query()
+            ->where('status', LeaveStatus::HrApproved)
+            ->whereDate('start_date', '<=', $to)
+            ->whereDate('end_date', '>=', $from)
+            ->with(['employee', 'leaveType'])
+            ->orderBy('start_date');
+
+        if ($ids !== null) {
+            $query->whereIn('employee_id', $ids);
+        }
+
+        return $query->get()
+            ->map(fn (LeaveRequest $request) => [
+                'employee_id' => $request->employee_id,
+                'name' => $request->employee->fullName(),
+                'leave_type' => $request->leaveType->name,
+                'until' => $request->end_date->toDateString(),
+            ])
+            ->all();
     }
 
     /**
@@ -225,12 +293,79 @@ class DashboardService
     {
         $byStatus = Employee::query()->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
 
+        $headcountByDepartment = TeamMember::query()
+            ->whereNull('team_members.ended_at')
+            ->join('teams', 'teams.id', '=', 'team_members.team_id')
+            ->selectRaw('teams.department_id, count(distinct team_members.employee_id) as headcount')
+            ->groupBy('teams.department_id')
+            ->pluck('headcount', 'department_id');
+
         return [
             'total' => (int) $byStatus->sum(),
             'active' => (int) ($byStatus[EmployeeStatus::Active->value] ?? 0),
             'by_status' => $byStatus->mapWithKeys(fn ($total, $status) => [$status => (int) $total]),
             'departments' => Department::query()->count(),
             'teams' => Team::query()->count(),
+            'by_department' => Department::query()
+                ->orderBy('name')
+                ->get()
+                ->map(fn (Department $department) => [
+                    'id' => $department->id,
+                    'name' => $department->name,
+                    'headcount' => (int) ($headcountByDepartment[$department->id] ?? 0),
+                ])
+                ->all(),
+        ];
+    }
+
+    /**
+     * Recent joiners and exits within the caller's employee.view scope
+     * (docs/PRD.md §78 — "HR activities"). Not a trend series — just the
+     * last 30 days, so a manager sees who arrived and who left.
+     *
+     * @return array<string, mixed>
+     */
+    private function peopleMovement(User $user): array
+    {
+        $ids = $this->scopeResolver->employeeIdsFor($user, PermissionName::EmployeeView);
+        $since = Carbon::now()->subDays(30);
+
+        $scoped = function () use ($ids) {
+            $query = Employee::query();
+
+            return $ids === null ? $query : $query->whereIn('id', $ids);
+        };
+
+        return [
+            'recent_joiners' => $scoped()
+                ->whereDate('joining_date', '>=', $since->toDateString())
+                ->orderByDesc('joining_date')
+                ->limit(10)
+                ->get()
+                ->map(fn (Employee $employee) => [
+                    'employee_id' => $employee->id,
+                    'name' => $employee->fullName(),
+                    'designation' => $employee->designation,
+                    'joining_date' => $employee->joining_date->toDateString(),
+                ])
+                ->all(),
+            'recent_exits' => $scoped()
+                ->whereIn('status', [
+                    EmployeeStatus::Resigned,
+                    EmployeeStatus::Terminated,
+                    EmployeeStatus::Archived,
+                ])
+                ->where('updated_at', '>=', $since)
+                ->orderByDesc('updated_at')
+                ->limit(10)
+                ->get()
+                ->map(fn (Employee $employee) => [
+                    'employee_id' => $employee->id,
+                    'name' => $employee->fullName(),
+                    'designation' => $employee->designation,
+                    'status' => $employee->status->value,
+                ])
+                ->all(),
         ];
     }
 

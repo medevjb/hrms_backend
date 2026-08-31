@@ -6,6 +6,7 @@ use Database\Factories\ShiftFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -14,10 +15,12 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $end_time
  * @property int $expected_work_minutes
  * @property int $break_minutes
+ * @property string|null $break_start
+ * @property string|null $break_end
  * @property int|null $late_grace_minutes
  * @property bool $active
  */
-#[Fillable(['name', 'start_time', 'end_time', 'expected_work_minutes', 'break_minutes', 'late_grace_minutes', 'active'])]
+#[Fillable(['name', 'start_time', 'end_time', 'expected_work_minutes', 'break_minutes', 'break_start', 'break_end', 'late_grace_minutes', 'active'])]
 class Shift extends Model
 {
     /** @use HasFactory<ShiftFactory> */
@@ -28,6 +31,19 @@ class Shift extends Model
     protected function casts(): array
     {
         return ['active' => 'boolean'];
+    }
+
+    protected static function booted(): void
+    {
+        // Keep break_minutes in step with the window whenever one is set —
+        // attendance math reads break_minutes, the schedule UI reads the
+        // window, and the two should never disagree.
+        static::saving(function (Shift $shift) {
+            if ($shift->break_start !== null && $shift->break_end !== null) {
+                $shift->break_minutes = (int) Carbon::parse($shift->break_start)
+                    ->diffInMinutes(Carbon::parse($shift->break_end), absolute: true);
+            }
+        });
     }
 
     /**

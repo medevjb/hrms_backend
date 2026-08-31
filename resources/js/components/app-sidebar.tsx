@@ -1,7 +1,12 @@
 import { Link } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-react';
+import {
+    Activity,
+    ClipboardList,
+    ListTree,
+    ScrollText,
+    ShieldCheck,
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
-import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -13,31 +18,34 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { useCurrentUrl } from '@/hooks/use-current-url';
+import { toUrl } from '@/lib/utils';
 import { dashboard } from '@/routes';
+import { audit, logs, queue, schedule } from '@/routes/system';
 import type { NavItem } from '@/types';
 
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-];
-
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
-        icon: FolderGit2,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
-    },
+const consoleNavItems: NavItem[] = [
+    { title: 'Overview', href: dashboard(), icon: Activity },
+    { title: 'Logs', href: logs(), icon: ScrollText },
+    { title: 'Queue', href: queue(), icon: ListTree },
+    { title: 'Schedule', href: schedule(), icon: ClipboardList },
+    { title: 'Audit', href: audit(), icon: ShieldCheck },
 ];
 
 export function AppSidebar() {
+    const { currentUrl } = useCurrentUrl();
+    const overviewPath = toUrl(dashboard());
+
+    const items = consoleNavItems.map((item) => {
+        const path = toUrl(item.href);
+        const isActive =
+            path === overviewPath
+                ? currentUrl === overviewPath
+                : currentUrl.startsWith(path);
+
+        return { ...item, isActive };
+    });
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
@@ -53,11 +61,10 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
+                <NavMain items={items} label="Console" />
             </SidebarContent>
 
             <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
                 <NavUser />
             </SidebarFooter>
         </Sidebar>

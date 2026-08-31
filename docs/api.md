@@ -117,6 +117,9 @@ files         /documents/{id}/download   (authorized private stream, never a pub
 
 audit         /audit-logs
 
+rbac          /roles  /roles/{role}                       read-only catalogue + permission map (settings.manage)
+              /users/{user}/roles                         grant/revoke a role at a scope
+
 system        /system/health   (system.health.view — /system console, not this frontend)
 ```
 

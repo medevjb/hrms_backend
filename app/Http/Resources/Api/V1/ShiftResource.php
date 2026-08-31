@@ -24,6 +24,8 @@ class ShiftResource extends JsonResource
             'end_time' => Carbon::parse($this->end_time)->format('H:i'),
             'expected_work_minutes' => $this->expected_work_minutes,
             'break_minutes' => $this->break_minutes,
+            'break_start' => $this->break_start ? Carbon::parse($this->break_start)->format('H:i') : null,
+            'break_end' => $this->break_end ? Carbon::parse($this->break_end)->format('H:i') : null,
             'late_grace_minutes' => $this->late_grace_minutes,
             'is_overnight' => $this->isOvernight(),
             'active' => $this->active,

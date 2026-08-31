@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\V1\PayrollDisputeController;
 use App\Http\Controllers\Api\V1\PayrollEntryController;
 use App\Http\Controllers\Api\V1\PayrollPeriodController;
 use App\Http\Controllers\Api\V1\ReportController;
+use App\Http\Controllers\Api\V1\RoleController;
 use App\Http\Controllers\Api\V1\SalaryComponentController;
 use App\Http\Controllers\Api\V1\SettingsController;
 use App\Http\Controllers\Api\V1\ShiftController;
@@ -66,6 +67,9 @@ Route::prefix('branding')->name('branding.')->group(function () {
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('dashboard', [DashboardController::class, 'show'])->name('dashboard.show');
+
+    Route::get('roles', [RoleController::class, 'index'])->name('roles.index');
+    Route::get('roles/{role}', [RoleController::class, 'show'])->name('roles.show');
 
     Route::get('users/{user}/roles', [UserRoleController::class, 'index'])->name('users.roles.index');
     Route::post('users/{user}/roles', [UserRoleController::class, 'store'])->name('users.roles.store');

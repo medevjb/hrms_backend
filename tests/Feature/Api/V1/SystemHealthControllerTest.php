@@ -31,5 +31,10 @@ test('the health snapshot reports the framework facts and machinery status', fun
         ->assertJsonPath('data.environment', 'testing')
         ->assertJsonPath('data.database.status', 'ok')
         ->assertJsonPath('data.local_storage.status', 'ok')
-        ->assertJsonPath('data.scheduler.status', 'ok');
+        ->assertJsonPath('data.scheduler.status', 'ok')
+        // docs/PRD.md §79 "Recent Errors" — the 24h count is now part of the snapshot.
+        ->assertJsonStructure(['data' => [
+            'application_version', 'environment', 'laravel_version', 'php_version',
+            'database', 'local_storage', 'scheduler', 'queue', 'errors_24h', 'checked_at',
+        ]]);
 });

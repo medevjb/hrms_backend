@@ -17,6 +17,8 @@ use Throwable;
  */
 class SystemHealthService
 {
+    public function __construct(private readonly LogReader $logs) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -31,8 +33,22 @@ class SystemHealthService
             'local_storage' => $this->localStorage(),
             'scheduler' => $this->scheduler(),
             'queue' => $this->queue(),
+            'errors_24h' => $this->errorsLast24h(),
             'checked_at' => Carbon::now()->toIso8601String(),
         ];
+    }
+
+    /**
+     * docs/PRD.md §79 "Recent Errors" — one number shared by this endpoint and
+     * the console's Logs page (both read it through LogReader).
+     */
+    private function errorsLast24h(): int
+    {
+        try {
+            return $this->logs->errorCountSince(Carbon::now()->subDay());
+        } catch (Throwable) {
+            return 0;
+        }
     }
 
     /**

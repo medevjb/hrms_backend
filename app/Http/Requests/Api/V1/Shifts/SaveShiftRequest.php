@@ -25,6 +25,8 @@ class SaveShiftRequest extends FormRequest
             'end_time' => [$required, 'date_format:H:i'],
             'expected_work_minutes' => [$required, 'integer', 'min:1'],
             'break_minutes' => ['sometimes', 'integer', 'min:0'],
+            'break_start' => ['sometimes', 'nullable', 'date_format:H:i', 'required_with:break_end'],
+            'break_end' => ['sometimes', 'nullable', 'date_format:H:i', 'required_with:break_start', 'after:break_start'],
             // null = use organization_settings.late_grace_minutes (§16-§22).
             'late_grace_minutes' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'active' => ['sometimes', 'boolean'],
