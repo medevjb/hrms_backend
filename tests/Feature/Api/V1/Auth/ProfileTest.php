@@ -43,29 +43,45 @@ test('GET auth/profile works for a user with no employee record', function () {
         ->assertJsonPath('data.employee', null);
 });
 
-test('PUT auth/profile updates the name and own contact fields', function () {
+test('PUT auth/profile updates an employee name, contact fields, and syncs the account name', function () {
     $user = User::factory()->create(['name' => 'Old Name']);
     $employee = Employee::factory()->for($user)->create([
+        'first_name' => 'Old',
+        'last_name' => 'Name',
         'designation' => 'Recruiter',
         'phone' => null,
     ]);
 
     $response = $this->withHeaders(bearer($user))->putJson('/api/v1/auth/profile', [
-        'name' => 'New Name',
+        'first_name' => 'New',
+        'last_name' => 'Person',
         'phone' => '+8801999',
         'emergency_contact_name' => 'Kin',
         'designation' => 'CEO', // HR-controlled — must be ignored
     ]);
 
-    $response->assertOk()->assertJsonPath('data.name', 'New Name');
+    $response->assertOk()
+        ->assertJsonPath('data.name', 'New Person')
+        ->assertJsonPath('data.employee.first_name', 'New');
 
-    expect($user->fresh()->name)->toBe('New Name')
+    expect($user->fresh()->name)->toBe('New Person')
+        ->and($employee->fresh()->first_name)->toBe('New')
         ->and($employee->fresh()->phone)->toBe('+8801999')
         ->and($employee->fresh()->emergency_contact_name)->toBe('Kin')
         ->and($employee->fresh()->designation)->toBe('Recruiter');
 });
 
-test('PUT auth/profile requires a name', function () {
+test('PUT auth/profile lets an account with no employee record set its display name', function () {
+    $user = User::factory()->create(['name' => 'Admin']);
+
+    $this->withHeaders(bearer($user))->putJson('/api/v1/auth/profile', ['name' => 'System Admin'])
+        ->assertOk()
+        ->assertJsonPath('data.name', 'System Admin');
+
+    expect($user->fresh()->name)->toBe('System Admin');
+});
+
+test('PUT auth/profile requires a name when there is nothing else to identify by', function () {
     $user = User::factory()->create();
 
     $this->withHeaders(bearer($user))->putJson('/api/v1/auth/profile', ['name' => ''])

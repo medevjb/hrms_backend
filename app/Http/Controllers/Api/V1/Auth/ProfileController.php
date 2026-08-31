@@ -25,15 +25,23 @@ class ProfileController extends Controller
     public function update(UpdateProfileRequest $request): JsonResponse
     {
         $user = $request->user();
+        $employee = $user->employee;
 
-        $user->update(['name' => $request->validated('name')]);
+        if ($employee !== null) {
+            $employee->update($request->safe()->only([
+                'first_name',
+                'last_name',
+                'phone',
+                'address',
+                'emergency_contact_name',
+                'emergency_contact_phone',
+            ]));
 
-        $user->employee?->update($request->safe()->only([
-            'phone',
-            'address',
-            'emergency_contact_name',
-            'emergency_contact_phone',
-        ]));
+            // The account name always mirrors the employee's real name.
+            $user->update(['name' => $employee->fresh()->fullName()]);
+        } elseif ($request->filled('name')) {
+            $user->update(['name' => $request->validated('name')]);
+        }
 
         return ApiResponse::data(new ProfileResource($this->withRelations($user->fresh())));
     }

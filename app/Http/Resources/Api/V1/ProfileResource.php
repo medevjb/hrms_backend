@@ -35,6 +35,9 @@ class ProfileResource extends JsonResource
                 ? '/auth/profile/photo?v='.$employee->updated_at->timestamp
                 : null,
             'employee' => $employee === null ? null : [
+                'first_name' => $employee->first_name,
+                'last_name' => $employee->last_name,
+                'full_name' => $employee->fullName(),
                 'employee_code' => $employee->employee_code,
                 'designation' => $employee->designation,
                 'employment_type' => $employee->employment_type,
