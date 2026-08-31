@@ -80,8 +80,9 @@ mismatch table — read that before assuming a table is unnecessary.
 Read through a settings service at evaluation time — never hard-coded:
 
 ```text
-company_name, company_logo_path, timezone, currency, currency_decimal_places
-late_grace_minutes, weekend_days, default_shift_id
+company_name, app_title, company_logo_path, favicon_path, timezone, currency, currency_decimal_places
+late_grace_minutes, weekend_days, default_weekend_day, default_shift_id
+mail_from_name, mail_from_address, mail_host, mail_port, mail_username, mail_password (encrypted), mail_encryption
 payroll_cutoff_day, salary_day_calculation_method
 overtime_enabled, weekend_overtime_enabled, holiday_overtime_enabled,
 hourly_overtime_enabled, overtime_full_day_minutes, overtime_daily_salary_basis,
