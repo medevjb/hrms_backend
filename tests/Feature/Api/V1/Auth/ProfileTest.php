@@ -5,7 +5,9 @@ use App\Models\Employee;
 use App\Models\Team;
 use App\Models\TeamMember;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 
 function bearer(User $user): array
 {
@@ -86,6 +88,50 @@ test('PUT auth/password changes the password and revokes every token (§92.2)', 
     expect(Hash::check('a-brand-new-secret-1', $user->fresh()->password))->toBeTrue();
     // Every token gone — the one this request used, and every other device.
     $this->assertDatabaseCount('personal_access_tokens', 0);
+});
+
+test('a user can upload, replace, serve and remove their own photo', function () {
+    Storage::fake('local');
+    $user = User::factory()->create();
+    $employee = Employee::factory()->for($user)->create();
+
+    $upload = $this->withHeaders(bearer($user))->postJson('/api/v1/auth/profile/photo', [
+        'photo' => UploadedFile::fake()->image('me.jpg', 300, 300),
+    ]);
+    $upload->assertOk();
+    expect($upload->json('data.photo_url'))->toStartWith('/auth/profile/photo');
+
+    $firstPath = $employee->fresh()->profile_image_path;
+    Storage::disk('local')->assertExists($firstPath);
+
+    $this->withHeaders(bearer($user))->get('/api/v1/auth/profile/photo')->assertOk();
+
+    // Replacing drops the previous file.
+    $this->withHeaders(bearer($user))->postJson('/api/v1/auth/profile/photo', [
+        'photo' => UploadedFile::fake()->image('new.png'),
+    ])->assertOk();
+    Storage::disk('local')->assertMissing($firstPath);
+
+    $this->withHeaders(bearer($user))->deleteJson('/api/v1/auth/profile/photo')->assertOk();
+    expect($employee->fresh()->profile_image_path)->toBeNull();
+});
+
+test('uploading a non-image is rejected', function () {
+    Storage::fake('local');
+    $user = User::factory()->create();
+    Employee::factory()->for($user)->create();
+
+    $this->withHeaders(bearer($user))->postJson('/api/v1/auth/profile/photo', [
+        'photo' => UploadedFile::fake()->create('resume.pdf', 20, 'application/pdf'),
+    ])->assertStatus(422)->assertJsonValidationErrors('photo');
+});
+
+test('a user with no employee record cannot set a photo', function () {
+    $user = User::factory()->create();
+
+    $this->withHeaders(bearer($user))->postJson('/api/v1/auth/profile/photo', [
+        'photo' => UploadedFile::fake()->image('me.jpg'),
+    ])->assertStatus(409);
 });
 
 test('PUT auth/password rejects a wrong current password', function () {

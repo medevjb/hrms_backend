@@ -29,7 +29,7 @@ class ProfileResource extends JsonResource
             'email' => $this->email,
             'two_factor_enabled' => $this->hasEnabledTwoFactorAuthentication(),
             'photo_url' => $employee?->profile_image_path
-                ? '/auth/profile/photo?v='.($employee->updated_at?->timestamp ?? 0)
+                ? '/auth/profile/photo?v='.$employee->updated_at->timestamp
                 : null,
             'employee' => $employee === null ? null : [
                 'employee_code' => $employee->employee_code,

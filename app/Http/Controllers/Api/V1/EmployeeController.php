@@ -21,6 +21,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EmployeeController extends Controller
 {
@@ -153,6 +155,18 @@ class EmployeeController extends Controller
         abort_unless(Gate::allows('view', $employee), 404);
 
         return ApiResponse::data(new EmployeeResource($employee->load(self::EAGER_LOAD)));
+    }
+
+    public function photo(Employee $employee): StreamedResponse
+    {
+        abort_unless(Gate::allows('view', $employee), 404);
+        abort_if(
+            $employee->profile_image_path === null
+                || ! Storage::disk('local')->exists($employee->profile_image_path),
+            404,
+        );
+
+        return Storage::disk('local')->response($employee->profile_image_path);
     }
 
     public function store(CreateEmployeeRequest $request, EmployeeService $employees): JsonResponse

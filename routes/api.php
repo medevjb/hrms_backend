@@ -48,6 +48,9 @@ Route::prefix('auth')->name('auth.')->group(function () {
         // Self-service, every authenticated user — no permission (§92.1).
         Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');
         Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
+        Route::get('profile/photo', [ProfileController::class, 'showPhoto'])->name('profile.photo.show');
+        Route::post('profile/photo', [ProfileController::class, 'updatePhoto'])->name('profile.photo.update');
+        Route::delete('profile/photo', [ProfileController::class, 'deletePhoto'])->name('profile.photo.destroy');
         Route::put('password', [PasswordController::class, 'update'])->name('password.update');
     });
 });
@@ -63,6 +66,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('employees', [EmployeeController::class, 'index'])->name('employees.index');
     Route::post('employees', [EmployeeController::class, 'store'])->name('employees.store');
     Route::get('employees/{employee}', [EmployeeController::class, 'show'])->name('employees.show');
+    Route::get('employees/{employee}/photo', [EmployeeController::class, 'photo'])->name('employees.photo');
     Route::put('employees/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
     Route::delete('employees/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
     Route::post('employees/{employee}/resend-invitation', [EmployeeController::class, 'resendInvitation'])
