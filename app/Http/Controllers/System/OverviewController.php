@@ -24,6 +24,7 @@ class OverviewController extends Controller
     {
         return Inertia::render('system/overview', [
             'health' => $this->health->snapshot(),
+            'activity' => Inertia::defer(fn () => $this->logs->histogram(Carbon::now()->subDay())),
             'topErrors' => Inertia::defer(fn () => $this->logs->topErrors(Carbon::now()->subDay())),
         ]);
     }

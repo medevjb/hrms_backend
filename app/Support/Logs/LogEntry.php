@@ -28,6 +28,22 @@ class LogEntry
         return LogLevel::weight($this->raw ? 'ERROR' : $this->level);
     }
 
+    /**
+     * A plain-English sentence for a non-technical reader, or null for entries
+     * below WARNING (which need no explaining).
+     */
+    public function explanation(): ?string
+    {
+        $level = $this->raw ? 'ERROR' : $this->level;
+
+        if (LogLevel::weight($level) < LogLevel::WEIGHTS['WARNING']) {
+            return null;
+        }
+
+        return ErrorExplainer::explain($this->message, $this->trace)
+            ?? ErrorExplainer::generic($level);
+    }
+
     public function matchesText(string $needle): bool
     {
         if ($needle === '') {
@@ -47,6 +63,7 @@ class LogEntry
             'level' => $this->raw ? 'RAW' : $this->level,
             'channel' => $this->channel,
             'message' => $this->message,
+            'explanation' => $this->explanation(),
             'trace' => $this->trace,
             'raw' => $this->raw,
         ];

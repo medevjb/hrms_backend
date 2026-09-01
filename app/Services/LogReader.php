@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\Logs\ErrorExplainer;
 use App\Support\Logs\LogEntry;
 use App\Support\Logs\LogLevel;
 use App\Support\Logs\LogPage;
@@ -69,7 +70,58 @@ class LogReader
     }
 
     /**
-     * @return list<array{message: string, count: int, level: string, last_seen: string|null}>
+     * Bucketed log activity for the console's 24-hour charts: one entry per
+     * hour from `$since` to now, oldest first, tallied by severity band.
+     *
+     * @return list<array{start: string, total: int, info: int, warning: int, error: int}>
+     */
+    public function histogram(Carbon $since, int $buckets = 24, int $minutesPerBucket = 60): array
+    {
+        [$entries] = $this->read();
+
+        $since = $since->copy()->startOfMinute();
+        $spanSeconds = $buckets * $minutesPerBucket * 60;
+
+        /** @var list<array{start: string, total: int, info: int, warning: int, error: int}> $out */
+        $out = [];
+        for ($i = 0; $i < $buckets; $i++) {
+            $out[$i] = [
+                'start' => $since->copy()->addMinutes($i * $minutesPerBucket)->toIso8601String(),
+                'total' => 0,
+                'info' => 0,
+                'warning' => 0,
+                'error' => 0,
+            ];
+        }
+
+        foreach ($entries as $entry) {
+            if ($entry->loggedAt === null || $entry->loggedAt->lt($since)) {
+                continue;
+            }
+
+            $offset = $entry->loggedAt->getTimestamp() - $since->getTimestamp();
+            if ($offset < 0 || $offset >= $spanSeconds) {
+                continue;
+            }
+
+            $index = intdiv($offset, $minutesPerBucket * 60);
+            $level = $entry->raw ? 'ERROR' : $entry->level;
+
+            $band = match (true) {
+                LogLevel::isErrorOrHigher($level) => 'error',
+                LogLevel::weight($level) >= LogLevel::WEIGHTS['WARNING'] => 'warning',
+                default => 'info',
+            };
+
+            $out[$index]['total']++;
+            $out[$index][$band]++;
+        }
+
+        return array_values($out);
+    }
+
+    /**
+     * @return list<array{message: string, count: int, level: string, last_seen: string|null, explanation: string}>
      */
     public function topErrors(Carbon $since, int $limit = 10): array
     {
@@ -106,6 +158,11 @@ class LogReader
             (new Collection($groups))
                 ->sortByDesc('count')
                 ->take($limit)
+                ->map(fn (array $group): array => [
+                    ...$group,
+                    'explanation' => ErrorExplainer::explain($group['message'])
+                        ?? ErrorExplainer::generic($group['level']),
+                ])
                 ->all()
         );
     }

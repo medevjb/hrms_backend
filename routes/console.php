@@ -10,6 +10,10 @@ Artisan::command('inspire', function () {
 
 Schedule::command('app:record-scheduler-heartbeat')->everyMinute();
 
+// docs/PRD.md §79 — dispatches a heartbeat job every minute so the system
+// health check can tell whether a queue worker is actually consuming jobs.
+Schedule::command('app:ping-queue-worker')->everyMinute();
+
 // docs/PRD.md §137 — closes yesterday's attendance daily, well after any
 // shift (including an overnight one plus its check-in window) could still
 // be open. The app's server timezone (config('app.timezone'), UTC) is

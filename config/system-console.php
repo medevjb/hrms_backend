@@ -20,6 +20,7 @@ return [
         // `scheduler:heartbeat` cache key on the Overview page.
         'untracked_commands' => [
             'app:record-scheduler-heartbeat',
+            'app:ping-queue-worker',
         ],
     ],
 

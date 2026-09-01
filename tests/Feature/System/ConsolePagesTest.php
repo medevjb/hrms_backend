@@ -44,7 +44,7 @@ test('the overview page exposes the health snapshot', function () {
             ->where('health.environment', 'testing'));
 });
 
-test('the logs page echoes the filters and defers the entry page', function () {
+test('the logs page echoes the filters and streams entries for infinite scroll', function () {
     seedConsoleLog(implode("\n", [
         '[2026-08-31 09:00:00] local.INFO: a quiet note',
         '[2026-08-31 09:01:00] local.ERROR: the thing that broke',
@@ -57,12 +57,38 @@ test('the logs page echoes the filters and defers the entry page', function () {
             ->component('system/logs', shouldExist: false)
             ->where('filters.level', 'ERROR')
             ->where('filters.search', 'broke')
-            ->has('levels'));
+            ->has('levels')
+            ->has('result.entries', 1)
+            ->where('result.entries.0.message', 'the thing that broke')
+            ->where('result.entries.0.explanation', 'The app ran into an unexpected problem while handling a request.'));
+});
 
-    $props = inertiaPartial('/system/logs?level=ERROR&search=broke', 'system/logs', 'result');
+test('the logs page defers the 24-hour activity histogram', function () {
+    seedConsoleLog(implode("\n", [
+        '['.now()->subHours(2)->format('Y-m-d H:i:s').'] local.ERROR: boom',
+        '',
+    ]));
 
-    expect($props['result']['entries'])->toHaveCount(1);
-    expect($props['result']['entries'][0]['message'])->toBe('the thing that broke');
+    $this->get('/system/logs')->assertOk();
+
+    $props = inertiaPartial('/system/logs', 'system/logs', 'activity');
+
+    expect($props['activity'])->toHaveCount(24);
+    expect(array_sum(array_column($props['activity'], 'error')))->toBe(1);
+});
+
+test('the overview page explains its top errors in plain language', function () {
+    seedConsoleLog(implode("\n", [
+        '['.now()->subHour()->format('Y-m-d H:i:s').'] local.ERROR: SQLSTATE[HY000] [2002] Connection refused',
+        '',
+    ]));
+
+    $this->get('/system')->assertOk();
+
+    $props = inertiaPartial('/system', 'system/overview', 'topErrors');
+
+    expect($props['topErrors'])->toHaveCount(1);
+    expect($props['topErrors'][0]['explanation'])->toBe('The app could not reach the database.');
 });
 
 test('the schedule page lists registered commands with their last run', function () {

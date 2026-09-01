@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\RecordQueueHeartbeat;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -131,6 +132,36 @@ class SystemHealthService
             'connection' => $connection,
             'pending_jobs' => $pending,
             'failed_jobs' => $failed,
+            'worker' => $this->queueWorker(),
+        ];
+    }
+
+    /**
+     * Whether a queue worker is consuming jobs, judged by how long ago the
+     * scheduled {@see RecordQueueHeartbeat} last ran. `unknown` means
+     * no heartbeat has been seen yet (a fresh deploy, or the schedule is off).
+     *
+     * @return array<string, mixed>
+     */
+    private function queueWorker(): array
+    {
+        /** @var string|null $heartbeat */
+        $heartbeat = Cache::get('queue:worker-heartbeat');
+
+        if ($heartbeat === null) {
+            return ['status' => 'unknown', 'last_heartbeat' => null];
+        }
+
+        $minutesAgo = (int) Carbon::parse($heartbeat)->diffInMinutes(Carbon::now());
+
+        return [
+            'status' => match (true) {
+                $minutesAgo <= 3 => 'ok',
+                $minutesAgo <= 15 => 'stale',
+                default => 'error',
+            },
+            'last_heartbeat' => $heartbeat,
+            'minutes_ago' => $minutesAgo,
         ];
     }
 }

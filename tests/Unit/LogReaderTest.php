@@ -154,3 +154,39 @@ it('groups a recurring error into one top-errors row', function () {
     expect($top[0]['message'])->toBe('User {n} not found');
     expect($top[0]['last_seen'])->toContain('2026-08-31T11:10:00');
 });
+
+it('attaches a plain-English explanation to each top error', function () {
+    $log = implode("\n", [
+        '[2026-08-31 11:00:00] local.ERROR: SQLSTATE[HY000] [2002] Connection refused (Connection: mysql)',
+        '[2026-08-31 11:05:00] local.ERROR: something nobody has a pattern for',
+        '',
+    ]);
+
+    $top = reader($log)->topErrors(Carbon::parse('2026-08-31 00:00:00'));
+    $explanations = array_column($top, 'explanation');
+
+    expect($explanations)->toContain('The app could not reach the database.')
+        ->toContain('The app ran into an unexpected problem while handling a request.');
+});
+
+it('buckets log activity into hourly counts by severity', function () {
+    Carbon::setTestNow('2026-08-31 12:30:00');
+
+    $log = implode("\n", [
+        '[2026-08-31 10:15:00] local.INFO: a note',
+        '[2026-08-31 10:40:00] local.WARNING: careful',
+        '[2026-08-31 11:05:00] local.ERROR: boom',
+        '[2026-08-31 11:20:00] local.ERROR: boom again',
+        '[2026-08-30 09:00:00] local.ERROR: yesterday, out of range',
+        '',
+    ]);
+
+    $buckets = reader($log)->histogram(Carbon::parse('2026-08-31 00:00:00'), buckets: 24);
+
+    expect($buckets)->toHaveCount(24);
+    expect($buckets[10])->toMatchArray(['total' => 2, 'info' => 1, 'warning' => 1, 'error' => 0]);
+    expect($buckets[11])->toMatchArray(['total' => 2, 'error' => 2]);
+    expect(array_sum(array_column($buckets, 'total')))->toBe(4);
+
+    Carbon::setTestNow();
+});

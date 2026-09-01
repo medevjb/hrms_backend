@@ -1,8 +1,13 @@
-import { Deferred, Head, router, usePage } from '@inertiajs/react';
+import {
+    Deferred,
+    Head,
+    InfiniteScroll,
+    router,
+    usePage,
+} from '@inertiajs/react';
 import { useState } from 'react';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Collapsible,
     CollapsibleContent,
@@ -18,25 +23,36 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
 import { logs as logsRoute } from '@/routes/system';
-import type { LogFilters, LogPage, TopError } from '@/types/system';
-import { formatDateTime, LevelBadge } from './parts';
+import type {
+    ActivityBucket,
+    LogEntry,
+    LogFilters,
+    LogPage,
+    TopError,
+} from '@/types/system';
+import { ActivityChart } from './charts';
+import { formatDateTime, LevelRail, Panel, TopErrorList } from './parts';
 
 type PageProps = {
     filters: LogFilters;
     levels: string[];
-    result?: LogPage;
+    result: LogPage;
+    activity?: ActivityBucket[];
     topErrors?: TopError[];
 };
 
 const ALL_LEVELS = '__all__';
 
+const labelClass = 'text-[11px] tracking-wide text-muted-foreground uppercase';
+
 export default function Logs() {
     const { filters, levels } = usePage<PageProps>().props;
     const [search, setSearch] = useState(filters.search ?? '');
 
-    const apply = (next: Partial<LogFilters>) => {
-        const merged = { ...filters, search, ...next, page: next.page ?? 1 };
+    const applyFilters = (next: Partial<LogFilters>) => {
+        const merged = { ...filters, search, ...next, page: 1 };
         router.get(logsRoute().url, cleanParams(merged), {
             preserveState: true,
             preserveScroll: true,
@@ -47,28 +63,29 @@ export default function Logs() {
         <>
             <Head title="Logs" />
 
-            <div className="space-y-6">
+            <div className="mx-auto max-w-4xl space-y-8">
                 <Heading
                     variant="small"
                     title="Logs"
-                    description="Application log, newest first"
+                    description="Everything the app has written, newest first — in plain language, with the technical detail one click away."
                 />
 
                 <form
-                    className="flex flex-wrap items-end gap-3"
+                    className="flex flex-wrap items-end gap-3 rounded-xl border bg-muted/30 p-4"
                     onSubmit={(e) => {
                         e.preventDefault();
-                        apply({});
+                        applyFilters({});
                     }}
                 >
                     <div className="grid gap-1.5">
-                        <Label htmlFor="level">Min level</Label>
+                        <Label htmlFor="level" className={labelClass}>
+                            Min level
+                        </Label>
                         <Select
                             value={filters.level ?? ALL_LEVELS}
                             onValueChange={(value) =>
-                                apply({
-                                    level:
-                                        value === ALL_LEVELS ? null : value,
+                                applyFilters({
+                                    level: value === ALL_LEVELS ? null : value,
                                 })
                             }
                         >
@@ -89,121 +106,101 @@ export default function Logs() {
                     </div>
 
                     <div className="grid gap-1.5">
-                        <Label htmlFor="from">From</Label>
+                        <Label htmlFor="from" className={labelClass}>
+                            From
+                        </Label>
                         <Input
                             id="from"
                             type="datetime-local"
                             defaultValue={toLocalInput(filters.from)}
                             onChange={(e) =>
-                                apply({ from: e.target.value || null })
+                                applyFilters({ from: e.target.value || null })
                             }
                             className="w-52"
                         />
                     </div>
 
                     <div className="grid gap-1.5">
-                        <Label htmlFor="to">To</Label>
+                        <Label htmlFor="to" className={labelClass}>
+                            To
+                        </Label>
                         <Input
                             id="to"
                             type="datetime-local"
                             defaultValue={toLocalInput(filters.to)}
                             onChange={(e) =>
-                                apply({ to: e.target.value || null })
+                                applyFilters({ to: e.target.value || null })
                             }
                             className="w-52"
                         />
                     </div>
 
                     <div className="grid flex-1 gap-1.5">
-                        <Label htmlFor="search">Search</Label>
+                        <Label htmlFor="search" className={labelClass}>
+                            Search
+                        </Label>
                         <Input
                             id="search"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="message or exception text"
+                            placeholder="Message or error text"
                         />
                     </div>
 
                     <Button type="submit">Filter</Button>
                 </form>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">
-                            Top errors (last 24h)
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Deferred
-                            data="topErrors"
-                            fallback={<Skeleton className="h-16 w-full" />}
-                        >
-                            <TopErrors />
-                        </Deferred>
-                    </CardContent>
-                </Card>
+                <Panel title="Activity — last 24 hours">
+                    <Deferred
+                        data="activity"
+                        fallback={<Skeleton className="h-44 w-full" />}
+                    >
+                        <Activity />
+                    </Deferred>
+                </Panel>
 
-                <Deferred
-                    data="result"
-                    fallback={
-                        <div className="space-y-2">
-                            {Array.from({ length: 6 }).map((_, i) => (
-                                <Skeleton key={i} className="h-12 w-full" />
-                            ))}
-                        </div>
-                    }
-                >
-                    <Entries onPage={(page) => apply({ page })} />
-                </Deferred>
+                <Panel title="Errors — last 24 hours">
+                    <Deferred
+                        data="topErrors"
+                        fallback={<Skeleton className="h-16 w-full" />}
+                    >
+                        <TopErrors />
+                    </Deferred>
+                </Panel>
+
+                <Panel title="Log entries">
+                    <Entries />
+                </Panel>
             </div>
         </>
     );
 }
 
+function Activity() {
+    const { activity } = usePage<PageProps>().props;
+
+    return <ActivityChart buckets={activity ?? []} />;
+}
+
 function TopErrors() {
     const { topErrors } = usePage<PageProps>().props;
 
-    if (!topErrors || topErrors.length === 0) {
-        return (
-            <p className="text-sm text-muted-foreground">
-                No errors in the last 24 hours.
-            </p>
-        );
-    }
-
     return (
-        <ul className="divide-y">
-            {topErrors.map((error) => (
-                <li
-                    key={error.message}
-                    className="flex items-center justify-between gap-4 py-2"
-                >
-                    <span className="truncate font-mono text-sm">
-                        {error.message}
-                    </span>
-                    <span className="flex shrink-0 items-center gap-2">
-                        <LevelBadge level={error.level} />
-                        <span className="text-sm font-semibold tabular-nums">
-                            {error.count}
-                        </span>
-                    </span>
-                </li>
-            ))}
-        </ul>
+        <TopErrorList
+            errors={topErrors ?? []}
+            emptyMessage="No errors in the last 24 hours."
+        />
     );
 }
 
-function Entries({ onPage }: { onPage: (page: number) => void }) {
-    const { result, filters } = usePage<PageProps>().props;
-
-    if (!result) {
-        return null;
-    }
+function Entries() {
+    const { result } = usePage<PageProps>().props;
 
     if (result.entries.length === 0) {
         return (
-            <p className="text-sm text-muted-foreground">
-                No log entries match these filters.
+            <p className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+                No log entries match these filters. Widen the time range or
+                clear the search.
             </p>
         );
     }
@@ -212,72 +209,107 @@ function Entries({ onPage }: { onPage: (page: number) => void }) {
         <div className="space-y-3">
             {result.truncated && (
                 <p className="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-                    Results truncated — the scan hit its byte cap. Narrow the
-                    time range for a complete view.
+                    Showing the most recent entries only — the log is larger
+                    than the scan limit. Narrow the time range for a complete
+                    view.
                 </p>
             )}
 
-            <div className="divide-y rounded-md border">
-                {result.entries.map((entry, index) => (
-                    <Collapsible key={index}>
-                        <div className="flex items-start gap-3 p-3">
-                            <LevelBadge level={entry.level} />
-                            <div className="min-w-0 flex-1">
-                                <p className="font-mono text-sm break-words">
-                                    {entry.message}
-                                </p>
-                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                    {formatDateTime(entry.logged_at)}
-                                    {entry.channel
-                                        ? ` · ${entry.channel}`
-                                        : ''}
-                                </p>
-                                {entry.trace && (
-                                    <>
-                                        <CollapsibleTrigger asChild>
-                                            <Button
-                                                variant="link"
-                                                size="sm"
-                                                className="h-auto p-0 text-xs"
-                                            >
-                                                stack trace
-                                            </Button>
-                                        </CollapsibleTrigger>
-                                        <CollapsibleContent>
-                                            <pre className="mt-2 max-h-96 overflow-auto rounded bg-muted p-3 text-xs">
-                                                {entry.trace}
-                                            </pre>
-                                        </CollapsibleContent>
-                                    </>
-                                )}
-                            </div>
+            <InfiniteScroll
+                data="result"
+                itemsElement="#log-entries"
+                buffer={600}
+                manualAfter={5}
+                next={({ loading, fetch, manualMode, hasMore }) =>
+                    !hasMore ? (
+                        <p className="py-3 text-center text-xs text-muted-foreground">
+                            End of the log.
+                        </p>
+                    ) : loading ? (
+                        <span className="flex items-center justify-center gap-2 py-3 text-xs text-muted-foreground">
+                            <Spinner className="size-3" /> Loading older
+                            entries…
+                        </span>
+                    ) : manualMode ? (
+                        <div className="flex justify-center py-3">
+                            <Button variant="outline" size="sm" onClick={fetch}>
+                                Load older entries
+                            </Button>
                         </div>
-                    </Collapsible>
-                ))}
-            </div>
-
-            <div className="flex items-center justify-between">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={filters.page <= 1}
-                    onClick={() => onPage(filters.page - 1)}
+                    ) : null
+                }
+            >
+                <div
+                    id="log-entries"
+                    className="divide-y overflow-hidden rounded-xl border"
                 >
-                    Newer
-                </Button>
-                <span className="text-xs text-muted-foreground">
-                    page {result.page}
-                </span>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!result.has_more}
-                    onClick={() => onPage(filters.page + 1)}
-                >
-                    Older
-                </Button>
-            </div>
+                    {result.entries.map((entry, index) => (
+                        <LogRow
+                            key={`${entry.logged_at ?? 'na'}-${index}`}
+                            entry={entry}
+                        />
+                    ))}
+                </div>
+            </InfiniteScroll>
         </div>
+    );
+}
+
+function LogRow({ entry }: { entry: LogEntry }) {
+    return (
+        <Collapsible>
+            <div className="flex items-stretch">
+                <LevelRail level={entry.level} />
+                <div className="min-w-0 flex-1 px-4 py-3">
+                    {entry.explanation && (
+                        <p className="text-sm font-medium">
+                            {entry.explanation}
+                        </p>
+                    )}
+                    <p
+                        className={
+                            entry.explanation
+                                ? 'mt-1 font-mono text-xs break-words text-muted-foreground'
+                                : 'font-mono text-sm break-words'
+                        }
+                    >
+                        {entry.message}
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                        <span className="font-mono">
+                            {formatDateTime(entry.logged_at)}
+                        </span>
+                        {entry.channel && (
+                            <>
+                                <span aria-hidden>·</span>
+                                <span>{entry.channel}</span>
+                            </>
+                        )}
+                        {entry.trace && (
+                            <>
+                                <span aria-hidden>·</span>
+                                <CollapsibleTrigger asChild>
+                                    <Button
+                                        variant="link"
+                                        size="sm"
+                                        className="h-auto p-0 text-xs"
+                                    >
+                                        Technical detail
+                                    </Button>
+                                </CollapsibleTrigger>
+                            </>
+                        )}
+                    </div>
+                    {entry.trace && (
+                        <CollapsibleContent>
+                            <pre className="mt-2 max-h-96 overflow-auto rounded bg-muted p-3 text-xs">
+                                {entry.trace}
+                            </pre>
+                        </CollapsibleContent>
+                    )}
+                </div>
+            </div>
+        </Collapsible>
     );
 }
 

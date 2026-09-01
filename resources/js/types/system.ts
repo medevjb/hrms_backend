@@ -8,12 +8,38 @@ export type HealthSnapshot = {
     environment: string;
     laravel_version: string;
     php_version: string;
-    database: { status: string; connection?: string; latency_ms?: number; message?: string };
+    database: {
+        status: string;
+        connection?: string;
+        latency_ms?: number;
+        message?: string;
+    };
     local_storage: { status: string; disk?: string; message?: string };
-    scheduler: { status: string; last_heartbeat: string | null; minutes_ago?: number };
-    queue: { connection: string; pending_jobs: number; failed_jobs: number };
+    scheduler: {
+        status: string;
+        last_heartbeat: string | null;
+        minutes_ago?: number;
+    };
+    queue: {
+        connection: string;
+        pending_jobs: number;
+        failed_jobs: number;
+        worker: {
+            status: string;
+            last_heartbeat: string | null;
+            minutes_ago?: number;
+        };
+    };
     errors_24h: number;
     checked_at: string;
+};
+
+export type ActivityBucket = {
+    start: string;
+    total: number;
+    info: number;
+    warning: number;
+    error: number;
 };
 
 export type TopError = {
@@ -21,6 +47,7 @@ export type TopError = {
     count: number;
     level: string;
     last_seen: string | null;
+    explanation: string;
 };
 
 export type LogEntry = {
@@ -28,6 +55,7 @@ export type LogEntry = {
     level: string;
     channel: string | null;
     message: string;
+    explanation: string | null;
     trace: string | null;
     raw: boolean;
 };
@@ -70,7 +98,12 @@ export type FailedJob = {
 
 export type Paginated<T> = {
     data: T[];
-    meta: { current_page: number; per_page: number; total: number; last_page: number };
+    meta: {
+        current_page: number;
+        per_page: number;
+        total: number;
+        last_page: number;
+    };
 };
 
 export type ScheduledRun = {
