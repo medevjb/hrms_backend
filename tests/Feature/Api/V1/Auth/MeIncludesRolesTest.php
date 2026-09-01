@@ -49,6 +49,22 @@ test('auth/me includes the organization timezone, even for a user with no grants
     $response->assertJsonPath('data.organization.timezone', 'Asia/Dhaka');
 });
 
+test('auth/me includes the resolved reporting period for every session (§85)', function () {
+    OrganizationSettings::current()->update(['timezone' => 'UTC', 'reporting_month_cutoff_day' => 25]);
+    $this->travelTo('2026-09-10');
+
+    $user = User::factory()->create();
+    $token = $user->createToken('phpunit')->plainTextToken;
+
+    $response = $this->withHeader('Authorization', "Bearer {$token}")->getJson('/api/v1/auth/me');
+
+    $response->assertOk();
+    $response->assertJsonPath('data.organization.reporting_month_cutoff_day', 25);
+    $response->assertJsonPath('data.organization.reporting_period.key', '2026-09');
+    $response->assertJsonPath('data.organization.reporting_period.start_date', '2026-08-26');
+    $response->assertJsonPath('data.organization.reporting_period.end_date', '2026-09-25');
+});
+
 test('login response also includes roles and permissions', function () {
     $user = User::factory()->create();
     $role = Role::factory()->create(['name' => 'Admin']);
