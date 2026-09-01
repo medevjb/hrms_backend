@@ -1,7 +1,9 @@
 <?php
 
 use App\Enums\EmployeeStatus;
+use App\Enums\Scope;
 use App\Models\Employee;
+use App\Models\Role;
 use App\Models\Team;
 use App\Models\User;
 use App\Notifications\EmployeeInvitationNotification;
@@ -28,6 +30,44 @@ test('inviting creates a paired user nobody can log in as yet, and an INVITED em
     expect(Hash::check('password', $employee->user->password))->toBeFalse();
 
     Notification::assertSentTo($employee->user, EmployeeInvitationNotification::class);
+});
+
+test('inviting grants the Team Member role over the new hire\'s own records', function () {
+    Notification::fake();
+    $admin = User::factory()->create();
+
+    $employee = app(EmployeeService::class)->invite([
+        'email' => 'selfservice@example.com',
+        'first_name' => 'Self', 'last_name' => 'Service',
+        'joining_date' => '2026-09-01', 'designation' => 'X', 'employment_type' => 'FULL_TIME',
+    ], $admin);
+
+    $grant = $employee->user->roleAssignments()->with('role')->firstOrFail();
+    expect($grant->role->name)->toBe('Team Member');
+    expect($grant->scope)->toBe(Scope::Self);
+
+    // The baseline self-service permissions the sidebar and calendar need.
+    expect($employee->user->hasPermission('leave.request'))->toBeTrue();
+    expect($employee->user->hasPermission('attendance.view'))->toBeTrue();
+    expect($employee->user->hasPermission('payslip.view_self'))->toBeTrue();
+});
+
+test('inviting a second employee reuses the one Team Member role', function () {
+    Notification::fake();
+    $admin = User::factory()->create();
+
+    $first = app(EmployeeService::class)->invite([
+        'email' => 'first@example.com', 'first_name' => 'A', 'last_name' => 'B',
+        'joining_date' => '2026-09-01', 'designation' => 'X', 'employment_type' => 'FULL_TIME',
+    ], $admin);
+    $second = app(EmployeeService::class)->invite([
+        'email' => 'second@example.com', 'first_name' => 'C', 'last_name' => 'D',
+        'joining_date' => '2026-09-01', 'designation' => 'X', 'employment_type' => 'FULL_TIME',
+    ], $admin);
+
+    expect($first->user->roleAssignments()->first()->role_id)
+        ->toBe($second->user->roleAssignments()->first()->role_id);
+    expect(Role::where('name', 'Team Member')->count())->toBe(1);
 });
 
 test('inviting records the initial status history entry', function () {

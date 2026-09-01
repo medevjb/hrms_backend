@@ -26,6 +26,16 @@ an employee-ID set (PRD §10).
 7. System Admin / DevOps   (optional technical role, /system console only)
 ```
 
+## The baseline grant every employee gets (PRD §8)
+
+Inviting an employee (`EmployeeService::invite`) assigns the **Team Member** role at
+**SELF** scope to their paired user, so self-service works from day one: request leave,
+view own attendance, read holidays and announcements, see own payslips
+(`leave.request`, `attendance.view`, `holiday.view`, `announcement.view`,
+`payslip.view_self`). Higher roles (Team Leader, HR, …) layer on top through the Roles
+module — they never replace this one. A user with **no** role assignment sees an empty
+sidebar and a 403 from every scoped endpoint.
+
 ## Two separate chains (PRD §9)
 
 ```text
