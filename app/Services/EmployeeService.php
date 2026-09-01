@@ -4,7 +4,11 @@ namespace App\Services;
 
 use App\Enums\AuditAction;
 use App\Enums\EmployeeStatus;
+use App\Enums\PermissionName;
+use App\Enums\Scope;
 use App\Models\Employee;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Team;
 use App\Models\User;
@@ -52,11 +56,52 @@ class EmployeeService
             'overtime_eligible' => $data['overtime_eligible'] ?? true,
         ]);
 
+        $this->assignBaselineRole($user);
+
         $this->recordStatusChange($employee, null, EmployeeStatus::Invited, 'Employee created', $invitedBy);
 
         $this->sendInvitation($user);
 
         return $employee;
+    }
+
+    /**
+     * Every employee is at least a Team Member over their own records
+     * (docs/PRD.md §8) — the grant that makes self-service work: request
+     * leave, view own attendance, read holidays/announcements, see own
+     * payslips. Higher roles (Team Leader, HR, …) are layered on top later
+     * through the Roles module, never replacing this one.
+     *
+     * `firstOrCreate` + `syncWithoutDetaching` keeps this correct even if
+     * RolePermissionSeeder has not run (fresh test DBs, partial installs) —
+     * the seeder stays the source of truth, this is just a safety net.
+     */
+    private function assignBaselineRole(User $user): void
+    {
+        $role = Role::query()->firstOrCreate(
+            ['name' => 'Team Member'],
+            ['description' => 'An individual employee — own attendance, leave requests, payslips and announcements.'],
+        );
+
+        $baseline = [
+            PermissionName::AttendanceView,
+            PermissionName::LeaveRequest,
+            PermissionName::HolidayView,
+            PermissionName::AnnouncementView,
+            PermissionName::PayslipViewSelf,
+        ];
+
+        $permissionIds = collect($baseline)
+            ->map(fn (PermissionName $permission) => Permission::query()
+                ->firstOrCreate(['name' => $permission->value])->id);
+
+        $role->permissions()->syncWithoutDetaching($permissionIds);
+
+        $user->roleAssignments()->firstOrCreate([
+            'role_id' => $role->id,
+            'scope' => Scope::Self,
+            'scope_id' => null,
+        ]);
     }
 
     /**
