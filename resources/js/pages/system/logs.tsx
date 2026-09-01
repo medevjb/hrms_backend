@@ -63,7 +63,7 @@ export default function Logs() {
         <>
             <Head title="Logs" />
 
-            <div className="mx-auto max-w-4xl space-y-8">
+            <div className="space-y-8">
                 <Heading
                     variant="small"
                     title="Logs"

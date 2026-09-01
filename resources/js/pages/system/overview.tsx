@@ -266,7 +266,7 @@ export default function Overview() {
         <>
             <Head title="System overview" />
 
-            <div className="mx-auto max-w-6xl space-y-8">
+            <div className="space-y-8">
                 <Heading
                     variant="small"
                     title="Overview"
