@@ -6,6 +6,7 @@ use App\Enums\Scope;
 use App\Models\AttendanceRecord;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\OrganizationSettings;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Team;
@@ -73,6 +74,35 @@ test('the attendance report is scoped to the caller and filtered by date', funct
 
     $this->actingAs($user)
         ->getJson('/api/v1/reports/late_attendance?filter[date_from]=2026-08-01&filter[date_to]=2026-08-31')
+        ->assertOk()
+        ->assertJsonPath('data.total', 1);
+});
+
+test('a report with no dates defaults to the current reporting month', function () {
+    OrganizationSettings::current()->update(['timezone' => 'UTC', 'reporting_month_cutoff_day' => 25]);
+    $this->travelTo('2026-09-10');
+
+    $employee = Employee::factory()->create();
+    // In the Aug 26 – Sep 25 window.
+    AttendanceRecord::factory()->create(['employee_id' => $employee->id, 'work_date' => '2026-08-28', 'status' => AttendanceStatus::Late]);
+    // Before it — belongs to the previous reporting month.
+    AttendanceRecord::factory()->create(['employee_id' => $employee->id, 'work_date' => '2026-08-20', 'status' => AttendanceStatus::Late]);
+
+    $this->actingAs(reportUser([PermissionName::ReportView->value]))
+        ->getJson('/api/v1/reports/late_attendance')
+        ->assertOk()
+        ->assertJsonPath('data.total', 1);
+});
+
+test('a report scoped to an explicit period key uses that reporting month', function () {
+    OrganizationSettings::current()->update(['timezone' => 'UTC', 'reporting_month_cutoff_day' => 25]);
+    $this->travelTo('2026-09-10');
+
+    $employee = Employee::factory()->create();
+    AttendanceRecord::factory()->create(['employee_id' => $employee->id, 'work_date' => '2026-08-20', 'status' => AttendanceStatus::Late]);
+
+    $this->actingAs(reportUser([PermissionName::ReportView->value]))
+        ->getJson('/api/v1/reports/late_attendance?filter[period]=2026-08')
         ->assertOk()
         ->assertJsonPath('data.total', 1);
 });

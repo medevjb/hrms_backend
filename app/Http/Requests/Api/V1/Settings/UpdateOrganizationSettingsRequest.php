@@ -29,6 +29,9 @@ class UpdateOrganizationSettingsRequest extends FormRequest
             'weekend_days.*' => ['string', 'in:monday,tuesday,wednesday,thursday,friday,saturday,sunday'],
             'default_weekend_day' => ['sometimes', Rule::enum(Weekday::class)],
             'default_shift_id' => ['sometimes', 'nullable', 'integer', 'exists:shifts,id'],
+            // §85 — null clears it (calendar months); 1–28 keeps every month
+            // able to end on that day. Matches the payroll cutoff bounds.
+            'reporting_month_cutoff_day' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:28'],
         ];
     }
 }

@@ -54,22 +54,25 @@ class PayrollService
      * boundaries from the organization's cutoff day and snapshotting the
      * cutoff day and salary-day method (§64).
      *
+     * The payroll cutoff is an override: with none configured the period
+     * falls back to the organization reporting month (§85), so a payroll
+     * period covers exactly the same dates as the rest of the product.
+     *
      * @throws ValidationException
      */
     public function createPeriod(int $year, int $month, ?User $actor = null): PayrollPeriod
     {
         $settings = OrganizationSettings::current();
-        $cutoffDay = $settings->payroll_cutoff_day;
+        $cutoffDay = $settings->payroll_cutoff_day ?? $settings->reporting_month_cutoff_day;
 
-        if ($cutoffDay === null || $cutoffDay <= 0) {
-            $end = Carbon::create($year, $month, 1)->endOfMonth();
-            $start = $end->copy()->startOfMonth();
-        } else {
-            $end = Carbon::create($year, $month, min($cutoffDay, 28));
-            $start = $end->copy()->subMonthNoOverflow()->addDay();
-        }
+        $period = app(ReportingPeriodService::class)->forKey(
+            sprintf('%04d-%02d', $year, $month),
+            $cutoffDay,
+        );
 
-        $label = Carbon::create($year, $month, 1)->isoFormat('MMMM YYYY');
+        $start = $period->startDate;
+        $end = $period->endDate;
+        $label = $period->label;
 
         if (PayrollPeriod::query()->where('label', $label)->orWhere(fn ($q) => $q->where('start_date', $start->toDateString())->where('end_date', $end->toDateString()))->exists()) {
             throw ValidationException::withMessages(['label' => ["A payroll period for {$label} already exists."]]);

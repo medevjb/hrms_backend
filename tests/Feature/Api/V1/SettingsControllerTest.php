@@ -68,6 +68,67 @@ test('an invalid weekday is rejected for default_weekend_day', function () {
     ])->assertStatus(422);
 });
 
+test('organization settings expose the resolved reporting period', function () {
+    $user = userWithSettingsPermission(PermissionName::SettingsManage);
+
+    $this->actingAs($user)->getJson('/api/v1/settings/organization')
+        ->assertOk()
+        ->assertJsonPath('data.reporting_month_cutoff_day', null)
+        ->assertJsonStructure(['data' => ['reporting_period' => ['key', 'label', 'start_date', 'end_date']]]);
+});
+
+test('an admin can set the reporting month cutoff day and it shifts the resolved period', function () {
+    $user = userWithSettingsPermission(PermissionName::SettingsManage);
+
+    $this->travelTo('2026-09-10');
+
+    $response = $this->actingAs($user)->putJson('/api/v1/settings/organization', [
+        'reporting_month_cutoff_day' => 25,
+    ]);
+
+    $response->assertOk();
+    $response->assertJsonPath('data.reporting_month_cutoff_day', 25);
+    $response->assertJsonPath('data.reporting_period.start_date', '2026-08-26');
+    $response->assertJsonPath('data.reporting_period.end_date', '2026-09-25');
+    $response->assertJsonPath('data.reporting_period.label', 'September 2026');
+
+    expect(OrganizationSettings::current()->reporting_month_cutoff_day)->toBe(25);
+});
+
+test('a non-admin cannot change the reporting month cutoff day', function () {
+    $this->actingAs(User::factory()->create())
+        ->putJson('/api/v1/settings/organization', ['reporting_month_cutoff_day' => 25])
+        ->assertStatus(403);
+
+    expect(OrganizationSettings::current()->reporting_month_cutoff_day)->toBeNull();
+});
+
+test('the reporting month cutoff day must be between 1 and 28', function () {
+    $user = userWithSettingsPermission(PermissionName::SettingsManage);
+
+    foreach ([0, 29, 31] as $invalid) {
+        $this->actingAs($user)->putJson('/api/v1/settings/organization', [
+            'reporting_month_cutoff_day' => $invalid,
+        ])->assertStatus(422)->assertJsonValidationErrorFor('reporting_month_cutoff_day');
+    }
+});
+
+test('clearing the reporting month cutoff day returns to calendar months', function () {
+    $user = userWithSettingsPermission(PermissionName::SettingsManage);
+    OrganizationSettings::current()->update(['reporting_month_cutoff_day' => 25]);
+
+    $this->travelTo('2026-09-10');
+
+    $response = $this->actingAs($user)->putJson('/api/v1/settings/organization', [
+        'reporting_month_cutoff_day' => null,
+    ]);
+
+    $response->assertOk();
+    $response->assertJsonPath('data.reporting_month_cutoff_day', null);
+    $response->assertJsonPath('data.reporting_period.start_date', '2026-09-01');
+    $response->assertJsonPath('data.reporting_period.end_date', '2026-09-30');
+});
+
 test('attendance.settings.manage is a distinct permission from settings.manage', function () {
     $user = userWithSettingsPermission(PermissionName::SettingsManage);
 

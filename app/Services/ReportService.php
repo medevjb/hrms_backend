@@ -9,6 +9,7 @@ use App\Models\AttendanceRecord;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
+use App\Models\OrganizationSettings;
 use App\Models\OvertimeRecord;
 use App\Models\PayrollEntry;
 use App\Models\PayrollEntryLine;
@@ -17,7 +18,6 @@ use App\Models\TeamMember;
 use App\Models\User;
 use App\Support\Report;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Carbon;
 
 /**
  * docs/PRD.md §99 — the V1 report builders. Every report is narrowed to the
@@ -30,7 +30,7 @@ class ReportService
     public function __construct(private readonly ScopeResolver $scopeResolver) {}
 
     /**
-     * @param  array{date_from?: string|null, date_to?: string|null, department_id?: int|null, team_id?: int|null, employee_id?: int|null, payroll_period_id?: int|null}  $filters
+     * @param  array{period?: string|null, date_from?: string|null, date_to?: string|null, department_id?: int|null, team_id?: int|null, employee_id?: int|null, payroll_period_id?: int|null}  $filters
      */
     public function build(ReportType $type, array $filters, User $user): Report
     {
@@ -103,14 +103,25 @@ class ReportService
     }
 
     /**
+     * The window a date report covers. With no explicit range it is the
+     * organization reporting month (docs/PRD.md §85) — either the one named
+     * by a `period` key (`YYYY-MM`) or the current one. An explicit
+     * `date_from` / `date_to` overrides either edge.
+     *
      * @param  array<string, mixed>  $filters
      * @return array{string, string}
      */
     private function dateRange(array $filters): array
     {
+        $service = app(ReportingPeriodService::class);
+
+        $period = ! empty($filters['period'])
+            ? $service->forKey((string) $filters['period'], OrganizationSettings::current()->reporting_month_cutoff_day)
+            : $service->current();
+
         return [
-            (string) ($filters['date_from'] ?? Carbon::now()->startOfMonth()->toDateString()),
-            (string) ($filters['date_to'] ?? Carbon::now()->toDateString()),
+            (string) ($filters['date_from'] ?? $period->startDate->toDateString()),
+            (string) ($filters['date_to'] ?? $period->endDate->toDateString()),
         ];
     }
 

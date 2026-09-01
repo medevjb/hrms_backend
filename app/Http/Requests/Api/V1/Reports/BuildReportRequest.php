@@ -22,6 +22,7 @@ class BuildReportRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'filter.period' => ['sometimes', 'nullable', 'string', 'date_format:Y-m'],
             'filter.date_from' => ['sometimes', 'nullable', 'date'],
             'filter.date_to' => ['sometimes', 'nullable', 'date'],
             'filter.department_id' => ['sometimes', 'nullable', 'integer', Rule::exists('departments', 'id')],
@@ -32,11 +33,12 @@ class BuildReportRequest extends FormRequest
     }
 
     /**
-     * @return array{date_from: string|null, date_to: string|null, department_id: int|null, team_id: int|null, employee_id: int|null, payroll_period_id: int|null}
+     * @return array{period: string|null, date_from: string|null, date_to: string|null, department_id: int|null, team_id: int|null, employee_id: int|null, payroll_period_id: int|null}
      */
     public function filters(): array
     {
         return [
+            'period' => $this->input('filter.period'),
             'date_from' => $this->input('filter.date_from'),
             'date_to' => $this->input('filter.date_to'),
             'department_id' => $this->integer('filter.department_id') ?: null,

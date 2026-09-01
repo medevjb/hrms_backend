@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Api\V1;
 
 use App\Models\OrganizationSettings;
+use App\Services\ReportingPeriodService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -26,6 +27,10 @@ class OrganizationSettingsResource extends JsonResource
             'weekend_days' => $this->weekend_days,
             'default_weekend_day' => $this->default_weekend_day?->value,
             'default_shift_id' => $this->default_shift_id,
+            // §85 — the reporting-month cutoff and the period it resolves to
+            // right now, so every client renders the same "this month".
+            'reporting_month_cutoff_day' => $this->reporting_month_cutoff_day,
+            'reporting_period' => app(ReportingPeriodService::class)->current($this->resource)->toArray(),
         ];
     }
 }
