@@ -41,7 +41,7 @@ leave_balance_transactions, leave_requests, leave_approvals
 
 overtime_settings, overtime_records, overtime_approvals
 
-holidays, holiday_reminders, holiday_notices
+holidays, holiday_reminders, holiday_notices, personal_events
 
 announcements, announcement_targets, announcement_reads
 

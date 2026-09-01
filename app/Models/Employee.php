@@ -160,6 +160,14 @@ class Employee extends Model
     }
 
     /**
+     * @return HasMany<PersonalEvent, $this>
+     */
+    public function personalEvents(): HasMany
+    {
+        return $this->hasMany(PersonalEvent::class);
+    }
+
+    /**
      * @return HasMany<LeaveRequest, $this>
      */
     public function leaveRequests(): HasMany

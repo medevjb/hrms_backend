@@ -148,20 +148,64 @@ test('the "me" widget reports the effective weekend days — the employee overri
         ->assertJsonPath('data.widgets.me.weekend_days', ['sunday']);
 });
 
-test('each leave balance carries its entitlement and an approximate taken amount', function () {
+test('a leave balance with nothing taken reads back fully available', function () {
     $employee = Employee::factory()->create();
     $leaveType = LeaveType::factory()->create(['annual_allocation_days' => 15]);
-    $employee->leaveBalances()->create([
+    // A prorated mid-year opening — 11 accrued, none used.
+    $balance = $employee->leaveBalances()->create([
         'leave_type_id' => $leaveType->id,
         'leave_year' => Carbon::now()->year,
         'balance' => 11,
     ]);
+    $balance->transactions()->create(['type' => 'ACCRUAL', 'amount' => 11, 'note' => 'opening']);
 
     $this->actingAs($employee->user)->getJson('/api/v1/dashboard')
         ->assertOk()
         ->assertJsonPath('data.widgets.me.leave_balances.0.balance', 11)
-        ->assertJsonPath('data.widgets.me.leave_balances.0.entitlement', 15)
-        ->assertJsonPath('data.widgets.me.leave_balances.0.taken', 4);
+        ->assertJsonPath('data.widgets.me.leave_balances.0.taken', 0)
+        ->assertJsonPath('data.widgets.me.leave_balances.0.entitlement', 11);
+});
+
+test('taken reflects approved leave, net of cancellations', function () {
+    $employee = Employee::factory()->create();
+    $leaveType = LeaveType::factory()->create(['annual_allocation_days' => 15]);
+    $balance = $employee->leaveBalances()->create([
+        'leave_type_id' => $leaveType->id,
+        'leave_year' => Carbon::now()->year,
+        'balance' => 12,
+    ]);
+    $balance->transactions()->createMany([
+        ['type' => 'ACCRUAL', 'amount' => 15, 'note' => 'opening'],
+        ['type' => 'APPROVAL', 'amount' => -4],
+        ['type' => 'CANCELLATION', 'amount' => 1],
+    ]);
+
+    $this->actingAs($employee->user)->getJson('/api/v1/dashboard')
+        ->assertOk()
+        ->assertJsonPath('data.widgets.me.leave_balances.0.balance', 12)
+        ->assertJsonPath('data.widgets.me.leave_balances.0.taken', 3)
+        ->assertJsonPath('data.widgets.me.leave_balances.0.entitlement', 15);
+});
+
+test('the dashboard leave balances skip inactive types and other years', function () {
+    $employee = Employee::factory()->create();
+    $active = LeaveType::factory()->create(['annual_allocation_days' => 10, 'is_active' => true]);
+    $inactive = LeaveType::factory()->create(['annual_allocation_days' => 10, 'is_active' => false]);
+
+    $employee->leaveBalances()->create([
+        'leave_type_id' => $active->id, 'leave_year' => Carbon::now()->year, 'balance' => 8,
+    ]);
+    $employee->leaveBalances()->create([
+        'leave_type_id' => $inactive->id, 'leave_year' => Carbon::now()->year, 'balance' => 5,
+    ]);
+    $employee->leaveBalances()->create([
+        'leave_type_id' => $active->id, 'leave_year' => Carbon::now()->year - 1, 'balance' => 3,
+    ]);
+
+    $this->actingAs($employee->user)->getJson('/api/v1/dashboard')
+        ->assertOk()
+        ->assertJsonCount(1, 'data.widgets.me.leave_balances')
+        ->assertJsonPath('data.widgets.me.leave_balances.0.balance', 8);
 });
 
 test('the workforce widget breaks headcount down by department', function () {

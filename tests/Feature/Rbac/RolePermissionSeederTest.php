@@ -47,6 +47,26 @@ test('team member holds only self-scoped, low-privilege permissions', function (
     expect($names)->not->toContain(PermissionName::EmployeeFinancialManage->value);
 });
 
+test('HR can view holidays but not manage them', function () {
+    $this->seed(RolePermissionSeeder::class);
+
+    $names = Role::where('name', 'HR')->firstOrFail()->permissions()->pluck('name')->all();
+
+    expect($names)->toContain(PermissionName::HolidayView->value)
+        ->and($names)->not->toContain(PermissionName::HolidayManage->value);
+});
+
+test('holiday.manage is held only by Admin and Head of HR', function () {
+    $this->seed(RolePermissionSeeder::class);
+
+    $holders = Role::query()
+        ->whereHas('permissions', fn ($q) => $q->where('name', PermissionName::HolidayManage->value))
+        ->pluck('name')
+        ->all();
+
+    expect($holders)->toEqualCanonicalizing(['Admin', 'Head of HR']);
+});
+
 test('running the seeder twice does not duplicate roles or permissions', function () {
     $this->seed(RolePermissionSeeder::class);
     $this->seed(RolePermissionSeeder::class);

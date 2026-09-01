@@ -1513,6 +1513,12 @@ Original history must remain auditable.
 
 Higher roles can view attendance for employees under their authority.
 
+The `/attendance` page opens on a **month calendar** (the same grid as the
+self dashboard) with a day-by-day check-in / check-out / status list beside
+it — every role sees their own by default; anyone with `employee.view` gets
+an employee picker and a second **Records** tab holding the filterable
+table below.
+
 Filters:
 
 * employee;
@@ -1575,7 +1581,11 @@ Paternity Leave
 Special Leave
 ```
 
-Additional types may be created.
+Additional types may be created. A fresh install is seeded with Annual (20d,
+carry-forward capped at 10), Casual (10d), Sick (14d), and Unpaid (0d) —
+`LeaveTypeSeeder`, `firstOrCreate` on the code so a re-seed never overwrites
+Head HR's tuning. The catalogue is edited from **Settings → Leave** (the
+Leave page itself no longer carries a types tab).
 
 ---
 
@@ -1608,6 +1618,23 @@ Available Balance
 ```
 
 Balance adjustments must be auditable.
+
+"Days taken" shown to an employee (leave page, dashboard) is the real ledger
+figure — approvals net of cancellations — never `allocation − remaining`,
+which a prorated mid-year joiner or a since-reduced allocation would turn
+into phantom taken days. The "of N" total is derived so the row always
+reconciles: `taken + remaining`.
+
+Two adjustment paths, both auditable:
+
+* **Per employee** (`leave.balance.adjust` — HR and up). `PATCH
+  /leave-balances/{id}/adjust`, one leave type / one person, ± days + note.
+* **Org-wide** (`leave.policy.manage` — Admin / Head of HR only). `POST
+  /leave-balances/bulk-adjust`: for one leave type, either GRANT ± days,
+  SET everyone to a target, or REAPPLY_DEFAULT (back to the type's
+  allocation) — applied to every active employee's current-leave-year
+  balance, each getting its own transaction + audit row so it stays
+  reversible one person at a time. Run from **Settings → Leave**.
 
 ---
 
@@ -1941,7 +1968,8 @@ Overtime rules are evaluated independently.
 
 # 54. Holiday Calendar
 
-Maintain holidays manually in V1.
+Holidays are maintained by hand and, for Bangladesh, topped up automatically
+from Google's public "Holidays in Bangladesh" calendar.
 
 Fields:
 
@@ -1950,9 +1978,51 @@ Fields:
 * type;
 * description;
 * office/location if needed;
-* active status.
+* active status;
+* source — `MANUAL` or `GOOGLE_BD` (which importer, if any, owns the row).
 
-Future government calendar/API integration is outside V1.
+## Who can do what
+
+* `holiday.view` — see the calendar and list. Held by every role down to Team
+  Member (part of the baseline self-service grant).
+* `holiday.manage` — create, edit, delete holidays, and run the Bangladesh
+  sync. **Admin and Head of HR only.** HR and below are read-only here.
+
+## Bangladesh auto-import
+
+`holidays:import-bd` (Laravel Scheduler, weekly) and a "Sync Bangladesh
+holidays" button (`POST /holidays/import`, `holiday.manage`) both pull the
+standard national public holidays from Google's public iCal feed
+(`config/services.google_holidays.bd_ics_url`, no API key). Rules:
+
+* only entries Google marks "Public holiday" are imported — observances are skipped;
+* imported rows are tagged `source = GOOGLE_BD` and matched on the calendar
+  event UID, so a shifted religious date (Eid, Puja) moves in place;
+* a `MANUAL` row, or any date that already has a holiday, is never touched;
+* `type` is a best-effort keyword guess on first import only — a re-sync never
+  overrides a hand-set type or active status.
+
+---
+
+# 54.1 Personal Calendar Events
+
+Every employee can drop private notes on their own calendar — a single day
+or a span (`start_date`…`end_date`, `end_date >= start_date`), with a title
+and an optional description.
+
+* No permission — any authenticated user with a paired employee record.
+  Not gated by role; a Team Member has it just like an Admin.
+* Strictly personal. A personal event never appears on anyone else's
+  calendar and has **no** effect on attendance, the work-day calculation,
+  overtime, or leave. It is a reminder, nothing more.
+* Every read and write is scoped to the acting user's employee. Another
+  employee's event responds **404, not 403** (§139.2).
+* Surfaced as a "My events" tab on the holiday calendar page and overlaid
+  (in a distinct colour) on the holiday month grid.
+
+`personal_events` table: `employee_id`, `title`, `description`,
+`start_date`, `end_date`. Endpoints: `GET/POST /personal-events`,
+`PUT/DELETE /personal-events/{personalEvent}`.
 
 ---
 

@@ -35,4 +35,16 @@ return [
         ],
     ],
 
+    /*
+     | Google's public "Holidays in Bangladesh" calendar, as an iCal feed.
+     | No API key or auth — it is a world-readable URL. holidays:import-bd
+     | pulls the standard national public holidays from here.
+     */
+    'google_holidays' => [
+        'bd_ics_url' => env(
+            'GOOGLE_HOLIDAYS_BD_ICS_URL',
+            'https://calendar.google.com/calendar/ical/en.bd%23holiday%40group.v.calendar.google.com/public/basic.ics',
+        ),
+    ],
+
 ];

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\PermissionName;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Leave\AdjustLeaveBalanceRequest;
+use App\Http\Requests\Api\V1\Leave\BulkAdjustLeaveBalanceRequest;
 use App\Http\Resources\Api\V1\LeaveBalanceResource;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
@@ -52,6 +53,31 @@ class LeaveBalanceController extends Controller
         $balances = $leaveTypes->map(fn ($leaveType) => $this->balances->balanceFor($employee, $leaveType, $leaveYear));
 
         return response()->json(['data' => LeaveBalanceResource::collection($balances)]);
+    }
+
+    /**
+     * §37 org-wide balance operation — grant/set/reset a leave type's
+     * balance for every active employee at once. Policy-manager only
+     * (Admin / Head of HR); HR's per-employee `leave.balance.adjust` does
+     * not reach this.
+     */
+    public function bulkAdjust(BulkAdjustLeaveBalanceRequest $request): JsonResponse
+    {
+        Gate::authorize('manage', LeaveType::class);
+
+        $leaveType = LeaveType::query()->findOrFail($request->integer('leave_type_id'));
+
+        $affected = $this->balances->bulkApply(
+            $leaveType,
+            $request->validated('mode'),
+            $request->has('amount') && $request->validated('amount') !== null
+                ? (float) $request->validated('amount')
+                : null,
+            $request->validated('note'),
+            $request->user(),
+        );
+
+        return response()->json(['data' => ['affected' => $affected]]);
     }
 
     public function adjust(AdjustLeaveBalanceRequest $request, LeaveBalance $leaveBalance): JsonResponse

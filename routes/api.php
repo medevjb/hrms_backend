@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\V1\OvertimeController;
 use App\Http\Controllers\Api\V1\PayrollDisputeController;
 use App\Http\Controllers\Api\V1\PayrollEntryController;
 use App\Http\Controllers\Api\V1\PayrollPeriodController;
+use App\Http\Controllers\Api\V1\PersonalEventController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\RoleController;
 use App\Http\Controllers\Api\V1\SalaryComponentController;
@@ -131,9 +132,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('shift-overrides', [ShiftOverrideController::class, 'store'])->name('shift-overrides.store');
 
     Route::get('holidays', [HolidayController::class, 'index'])->name('holidays.index');
+    Route::post('holidays/import', [HolidayController::class, 'import'])->name('holidays.import');
     Route::post('holidays', [HolidayController::class, 'store'])->name('holidays.store');
     Route::put('holidays/{holiday}', [HolidayController::class, 'update'])->name('holidays.update');
     Route::delete('holidays/{holiday}', [HolidayController::class, 'destroy'])->name('holidays.destroy');
+
+    // Personal calendar notes — every employee, their own only (§54.1).
+    Route::get('personal-events', [PersonalEventController::class, 'index'])->name('personal-events.index');
+    Route::post('personal-events', [PersonalEventController::class, 'store'])->name('personal-events.store');
+    Route::put('personal-events/{personalEvent}', [PersonalEventController::class, 'update'])
+        ->name('personal-events.update');
+    Route::delete('personal-events/{personalEvent}', [PersonalEventController::class, 'destroy'])
+        ->name('personal-events.destroy');
 
     Route::get('holiday-notices', [HolidayNoticeController::class, 'index'])->name('holiday-notices.index');
     Route::post('holiday-notices/{holidayNotice}/approve', [HolidayNoticeController::class, 'approve'])
@@ -165,6 +175,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('leave-types/{leaveType}', [LeaveTypeController::class, 'destroy'])->name('leave-types.destroy');
 
     Route::get('leave-balances', [LeaveBalanceController::class, 'index'])->name('leave-balances.index');
+    Route::post('leave-balances/bulk-adjust', [LeaveBalanceController::class, 'bulkAdjust'])
+        ->name('leave-balances.bulk-adjust');
     Route::patch('leave-balances/{leaveBalance}/adjust', [LeaveBalanceController::class, 'adjust'])
         ->name('leave-balances.adjust');
 

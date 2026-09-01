@@ -102,21 +102,25 @@ class DashboardService
             ->whereDate('work_date', $today)
             ->first();
 
+        $leaveService = app(LeaveBalanceService::class);
+        $leaveYear = $leaveService->leaveYearFor(Carbon::parse($today), $settings->leave_year_start_month);
+
         $leaveBalances = $employee->leaveBalances()
+            ->where('leave_year', $leaveYear)
+            ->whereHas('leaveType', fn ($query) => $query->where('is_active', true))
             ->with('leaveType')
             ->get()
-            ->map(function ($balance) {
-                $entitlement = (float) $balance->leaveType->annual_allocation_days;
+            ->map(function ($balance) use ($leaveService) {
+                // `taken` from the real ledger; `entitlement` derived so the
+                // row reconciles (allocated − taken = balance) even for a
+                // prorated mid-year joiner or a since-changed allocation.
+                $taken = $leaveService->daysTakenFor($balance);
 
                 return [
                     'leave_type' => $balance->leaveType->name,
                     'balance' => (float) $balance->balance,
-                    'entitlement' => $entitlement,
-                    // Approximation: entitlement minus what's left. Ignores
-                    // carry-forward and manual adjustments, but keeps this to
-                    // one query instead of replaying each balance's ledger —
-                    // accurate enough for a dashboard progress bar.
-                    'taken' => max(0.0, $entitlement - (float) $balance->balance),
+                    'entitlement' => (float) $balance->balance + $taken,
+                    'taken' => $taken,
                 ];
             });
 

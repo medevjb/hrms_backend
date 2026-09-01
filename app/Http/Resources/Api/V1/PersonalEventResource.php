@@ -2,12 +2,12 @@
 
 namespace App\Http\Resources\Api\V1;
 
-use App\Models\Holiday;
+use App\Models\PersonalEvent;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/** @mixin Holiday */
-class HolidayResource extends JsonResource
+/** @mixin PersonalEvent */
+class PersonalEventResource extends JsonResource
 {
     /**
      * @return array<string, mixed>
@@ -17,13 +17,9 @@ class HolidayResource extends JsonResource
         return [
             'id' => $this->id,
             'title' => $this->title,
-            'date' => $this->date->toDateString(),
-            'type' => $this->type->value,
             'description' => $this->description,
-            'office_location' => $this->office_location,
-            'active' => $this->active,
-            'source' => $this->source->value,
-            'synced_at' => $this->synced_at?->toIso8601String(),
+            'start_date' => $this->start_date->toDateString(),
+            'end_date' => $this->end_date->toDateString(),
         ];
     }
 }

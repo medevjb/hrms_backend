@@ -109,8 +109,9 @@ class RolePermissionSeeder extends Seeder
             PermissionName::OvertimeView,
             PermissionName::OvertimeReview,
             PermissionName::OvertimeApprove,
+            // Holidays: HR reads the calendar; only Admin and Head of HR
+            // add/edit/remove holidays or trigger the Bangladesh sync (§54).
             PermissionName::HolidayView,
-            PermissionName::HolidayManage,
             PermissionName::AnnouncementView,
             PermissionName::AnnouncementCreate,
             PermissionName::PayrollView,

@@ -90,11 +90,12 @@ attendance    /attendance/today  /attendance/check-in  /attendance/check-out
               /attendance  /attendance/{id}/adjust
 
 leave         /leave-types  /leave-requests  /leave-requests/{id}/approve|reject|cancel
-              /leave-balances  /leave-balances/{id}/adjust
+              /leave-balances  /leave-balances/{id}/adjust  /leave-balances/bulk-adjust
 
 overtime      /overtime  /overtime/{id}  /overtime/{id}/approve|reject  /overtime/{id}/adjust
 
-holidays      /holidays  /holiday-notices  /holiday-notices/{id}/approve|download
+holidays      /holidays  /holidays/import  /holiday-notices  /holiday-notices/{id}/approve|download
+              /personal-events  /personal-events/{id}
 
 announcements /announcements  /announcements/{id}/publish|read
 

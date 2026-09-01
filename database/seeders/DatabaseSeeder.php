@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(RolePermissionSeeder::class);
         $this->call(SalaryComponentSeeder::class);
+        $this->call(LeaveTypeSeeder::class);
 
         // User::factory(10)->create();
 

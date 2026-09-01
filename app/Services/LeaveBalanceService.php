@@ -226,6 +226,68 @@ class LeaveBalanceService
     }
 
     /**
+     * §37 — an org-wide balance operation for Admin / Head of HR. For every
+     * active employee's current-leave-year balance of this type, applies:
+     *   GRANT           +$amount days (may be negative to claw back)
+     *   SET             a delta landing exactly on $amount days
+     *   REAPPLY_DEFAULT  a delta landing on the type's annual_allocation_days
+     * Each employee still gets its own Adjustment transaction + audit row,
+     * so a bulk run stays reversible one person at a time.
+     *
+     * @return int employees whose balance actually moved
+     */
+    public function bulkApply(LeaveType $leaveType, string $mode, ?float $amount, string $note, User $actor): int
+    {
+        $settings = OrganizationSettings::current();
+        $leaveYear = $this->leaveYearFor(Carbon::now(), $settings->leave_year_start_month);
+
+        $employees = Employee::query()
+            ->whereIn('status', [EmployeeStatus::Active, EmployeeStatus::Probation, EmployeeStatus::NoticePeriod])
+            ->get();
+
+        $target = $mode === 'REAPPLY_DEFAULT'
+            ? (float) $leaveType->annual_allocation_days
+            : (float) $amount;
+
+        $affected = 0;
+
+        foreach ($employees as $employee) {
+            $balance = $this->balanceFor($employee, $leaveType, $leaveYear);
+
+            $delta = $mode === 'GRANT'
+                ? (float) $amount
+                : $target - (float) $balance->balance;
+
+            if (abs($delta) < 0.01) {
+                continue;
+            }
+
+            $this->adjust($balance, $delta, $note, $actor);
+            $affected++;
+        }
+
+        return $affected;
+    }
+
+    /**
+     * Days actually consumed against this balance this year — the net of
+     * approval debits and cancellation credits. Never the
+     * entitlement-minus-balance shortcut, which reads a mid-year joiner's
+     * prorated opening (or a reduced allocation) as leave already taken.
+     */
+    public function daysTakenFor(LeaveBalance $balance): float
+    {
+        $net = (float) $balance->transactions()
+            ->whereIn('type', [
+                LeaveBalanceTransactionType::Approval,
+                LeaveBalanceTransactionType::Cancellation,
+            ])
+            ->sum('amount');
+
+        return max(0.0, -$net);
+    }
+
+    /**
      * §37 manual adjustment — always auditable, never a bare column write.
      */
     public function adjust(LeaveBalance $balance, float $amount, string $note, User $actor): LeaveBalance

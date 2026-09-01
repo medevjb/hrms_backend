@@ -27,6 +27,13 @@ Schedule::command('leave:rollover')->dailyAt('01:00');
 // per holiday, so running it every day (not just once per holiday) is safe.
 Schedule::command('holidays:scan-notices')->dailyAt('06:00');
 
+// Bangladesh national public holidays, pulled from Google's public
+// "Holidays in Bangladesh" calendar. Weekly is plenty — the feed only
+// moves when a religious date is confirmed or a new year is published.
+// Upserts by the Google event UID and never touches a hand-added or
+// admin-edited holiday (see App\Services\BangladeshHolidayImporter).
+Schedule::command('holidays:import-bd')->weeklyOn(1, '04:00');
+
 // docs/PRD.md §57 — releases announcements whose scheduled publish_at has
 // arrived and expires ones past their expires_at. Hourly so a scheduled
 // publish lands close to its intended time.

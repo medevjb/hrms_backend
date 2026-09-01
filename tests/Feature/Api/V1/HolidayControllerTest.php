@@ -6,6 +6,8 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRole;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Http;
 
 function userWithHolidayPermission(PermissionName $permission): User
 {
@@ -56,6 +58,36 @@ test('updating a holiday', function () {
 
     $response->assertOk();
     $response->assertJsonPath('data.title', 'New Name');
+});
+
+test('importing Bangladesh holidays requires holiday.manage', function () {
+    $user = userWithHolidayPermission(PermissionName::HolidayView);
+
+    $this->actingAs($user)->postJson('/api/v1/holidays/import')->assertStatus(403);
+});
+
+test('a user with holiday.manage can import Bangladesh holidays from the Google feed', function () {
+    Carbon::setTestNow('2026-01-15 09:00:00');
+    config(['services.google_holidays.bd_ics_url' => 'https://calendar.example/bd.ics']);
+    Http::fake([
+        'calendar.example/*' => Http::response(
+            file_get_contents(base_path('tests/Fixtures/bd-holidays.ics')),
+            200,
+        ),
+    ]);
+
+    $user = userWithHolidayPermission(PermissionName::HolidayManage);
+
+    $response = $this->actingAs($user)->postJson('/api/v1/holidays/import');
+
+    $response->assertOk();
+    $response->assertJsonPath('data.created', 2);
+    $response->assertJsonPath('data.updated', 0);
+    $response->assertJsonPath('data.skipped', 0);
+
+    expect(Holiday::query()->count())->toBe(2);
+
+    Carbon::setTestNow();
 });
 
 test('deleting a holiday requires holiday.manage and returns 204', function () {

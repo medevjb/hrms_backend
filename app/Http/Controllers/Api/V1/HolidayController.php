@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Holidays\SaveHolidayRequest;
 use App\Http\Resources\Api\V1\HolidayResource;
 use App\Models\Holiday;
+use App\Services\BangladeshHolidayImporter;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
@@ -29,6 +30,18 @@ class HolidayController extends Controller
         $holiday = Holiday::query()->create($request->validated());
 
         return ApiResponse::data(new HolidayResource($holiday), status: 201);
+    }
+
+    /**
+     * Pull the standard Bangladesh national public holidays from Google's
+     * public calendar. Same importer the weekly holidays:import-bd command
+     * runs; safe to trigger repeatedly.
+     */
+    public function import(BangladeshHolidayImporter $importer): JsonResponse
+    {
+        Gate::authorize('create', Holiday::class);
+
+        return ApiResponse::data($importer->import());
     }
 
     public function update(SaveHolidayRequest $request, Holiday $holiday): JsonResponse

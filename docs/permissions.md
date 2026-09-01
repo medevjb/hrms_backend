@@ -36,6 +36,10 @@ view own attendance, read holidays and announcements, see own payslips
 module — they never replace this one. A user with **no** role assignment sees an empty
 sidebar and a 403 from every scoped endpoint.
 
+A handful of self-service endpoints carry **no permission at all** — they key off the
+acting user's own paired employee: the profile/password endpoints (§92.1) and personal
+calendar events (`/personal-events`, PRD §54.1).
+
 ## Two separate chains (PRD §9)
 
 ```text
@@ -78,10 +82,17 @@ shift.view / .manage / .override
 attendance.view / .manage / .correct
 
 leave.request / .review / .approve / .override / .policy.manage / .balance.adjust
+                             ← .balance.adjust is a per-employee correction (HR and up).
+                               The org-wide bulk balance op (POST /leave-balances/bulk-adjust)
+                               and the leave-type catalogue are .policy.manage — Admin /
+                               Head of HR only.
 
 overtime.view / .review / .approve / .adjust / .policy.manage
 
 holiday.view / .manage / .notice.approve
+                             ← .manage (holiday CRUD + Bangladesh Google sync) is
+                               Admin and Head of HR only; HR and below are read-only.
+                               .notice.approve is Head of HR (+ Admin).
 
 announcement.view / .create / .publish
 
