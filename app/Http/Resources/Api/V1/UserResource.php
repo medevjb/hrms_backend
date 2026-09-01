@@ -4,6 +4,7 @@ namespace App\Http\Resources\Api\V1;
 
 use App\Models\OrganizationSettings;
 use App\Models\User;
+use App\Services\ReportingPeriodService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -40,6 +41,12 @@ class UserResource extends JsonResource
                 'name' => $organization->company_name,
                 'app_title' => $organization->displayTitle(),
                 'logo_url' => $organization->logoUrl(),
+                // §85 — the custom reporting month. Every session needs it
+                // to render the same "this month" as payroll and reports;
+                // /settings/organization is settings.manage-gated, so like
+                // the timezone it travels here.
+                'reporting_month_cutoff_day' => $organization->reporting_month_cutoff_day,
+                'reporting_period' => app(ReportingPeriodService::class)->current($organization)->toArray(),
             ],
         ];
     }

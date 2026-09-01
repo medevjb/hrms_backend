@@ -94,6 +94,33 @@ test('a custom cutoff shifts the period boundaries', function () {
         ->and($period->cutoff_day_used)->toBe(25);
 });
 
+test('with no payroll cutoff the period falls back to the organization reporting month', function () {
+    OrganizationSettings::current()->update([
+        'payroll_cutoff_day' => null,
+        'reporting_month_cutoff_day' => 25,
+    ]);
+
+    $period = app(PayrollService::class)->createPeriod(2026, 9);
+
+    expect($period->start_date->toDateString())->toBe('2026-08-26')
+        ->and($period->end_date->toDateString())->toBe('2026-09-25')
+        ->and($period->label)->toBe('September 2026')
+        ->and($period->cutoff_day_used)->toBe(25);
+});
+
+test('an explicit payroll cutoff still overrides the reporting month', function () {
+    OrganizationSettings::current()->update([
+        'payroll_cutoff_day' => 20,
+        'reporting_month_cutoff_day' => 25,
+    ]);
+
+    $period = app(PayrollService::class)->createPeriod(2026, 9);
+
+    expect($period->start_date->toDateString())->toBe('2026-08-21')
+        ->and($period->end_date->toDateString())->toBe('2026-09-20')
+        ->and($period->cutoff_day_used)->toBe(20);
+});
+
 test('base salary plus allowances is the gross, and net with no deductions equals gross', function () {
     $employee = pcEmployeeWithSalary('30000', '5000');
     $entry = pcEntry($employee, pcPeriod());

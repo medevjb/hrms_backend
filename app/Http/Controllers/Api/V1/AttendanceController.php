@@ -10,7 +10,9 @@ use App\Http\Resources\Api\V1\AttendanceRecordResource;
 use App\Http\Resources\Api\V1\AttendanceTodayResource;
 use App\Models\AttendanceRecord;
 use App\Models\Employee;
+use App\Models\OrganizationSettings;
 use App\Services\AttendanceService;
+use App\Services\ReportingPeriodService;
 use App\Services\ScopeResolver;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -69,6 +71,20 @@ class AttendanceController extends Controller
 
         if ($date = $request->input('filter.date')) {
             $query->where('work_date', $date);
+        }
+
+        // §85 — `filter[period]=YYYY-MM` scopes to that reporting month
+        // without the caller repeating the boundary math. Explicit
+        // date_from / date_to below still narrow further.
+        if ($period = $request->input('filter.period')) {
+            $resolved = app(ReportingPeriodService::class)->forKey(
+                (string) $period,
+                OrganizationSettings::current()->reporting_month_cutoff_day,
+            );
+            $query->whereBetween('work_date', [
+                $resolved->startDate->toDateString(),
+                $resolved->endDate->toDateString(),
+            ]);
         }
 
         if ($dateFrom = $request->input('filter.date_from')) {

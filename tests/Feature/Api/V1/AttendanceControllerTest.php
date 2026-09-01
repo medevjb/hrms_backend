@@ -129,6 +129,21 @@ test('a user with attendance.view sees records within their scope', function () 
     $response->assertJsonCount(1, 'data');
 });
 
+test('filtering attendance by a reporting-period key', function () {
+    OrganizationSettings::current()->update(['reporting_month_cutoff_day' => 25]);
+
+    $employee = Employee::factory()->create();
+    AttendanceRecord::factory()->create(['employee_id' => $employee->id, 'work_date' => '2026-08-28']); // in Sep period
+    AttendanceRecord::factory()->create(['employee_id' => $employee->id, 'work_date' => '2026-08-20']); // in Aug period
+
+    $user = userWithAttendancePermission(PermissionName::AttendanceView);
+
+    $this->actingAs($user)->getJson('/api/v1/attendance?filter[period]=2026-09')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.work_date', '2026-08-28');
+});
+
 test('filtering attendance by status', function () {
     $employeeA = Employee::factory()->create();
     $employeeB = Employee::factory()->create();

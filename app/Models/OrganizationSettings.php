@@ -45,6 +45,7 @@ use Illuminate\Support\Facades\Cache;
  * @property int $attendance_checkin_window_minutes
  * @property int $leave_year_start_month
  * @property int|null $leave_carry_forward_cap_days
+ * @property int|null $reporting_month_cutoff_day
  * @property string|null $app_title
  * @property string|null $favicon_path
  * @property string|null $mail_from_name
@@ -65,6 +66,7 @@ use Illuminate\Support\Facades\Cache;
     'overtime_hourly_rate_mode', 'overtime_hourly_fixed_rate', 'overtime_hourly_multiplier',
     'auto_absent_enabled', 'missing_checkout_policy', 'attendance_min_minutes_half_day',
     'attendance_checkin_window_minutes', 'leave_year_start_month', 'leave_carry_forward_cap_days',
+    'reporting_month_cutoff_day',
     'mail_from_name', 'mail_from_address', 'mail_host', 'mail_port',
     'mail_username', 'mail_password', 'mail_encryption',
 ])]
@@ -115,6 +117,7 @@ class OrganizationSettings extends Model
             'overtime_daily_salary_basis' => OvertimeDailySalaryBasis::class,
             'overtime_hourly_rate_mode' => OvertimeHourlyRateMode::class,
             'missing_checkout_policy' => MissingCheckoutPolicy::class,
+            'reporting_month_cutoff_day' => 'integer',
             'overtime_hourly_fixed_rate' => 'decimal:4',
             'overtime_hourly_multiplier' => 'decimal:2',
             'mail_password' => 'encrypted',

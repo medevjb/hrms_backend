@@ -2957,7 +2957,25 @@ attendance_min_minutes_half_day   §29 HALF_DAY had no producing rule
 
 leave_year_start_month            §144 accrual
 leave_carry_forward_cap_days
+
+reporting_month_cutoff_day         §85 — org-wide reporting month; see below
 ```
+
+**Reporting month (`reporting_month_cutoff_day`).** Admin-only, 1–28 or null.
+Null means every reporting month is the calendar month (the original
+behaviour). Set to `C`, reporting month *M* runs from day `C+1` of *M-1*
+through day `C` of *M*, and is always labelled and keyed (`YYYY-MM`) by the
+month it ends in — cutoff 25 makes the window ending 25 Sep "September". A
+single resolver (`ReportingPeriodService`) is the only place month
+boundaries are computed: attendance, the dashboard "this month" figures,
+reports (default range and the `filter[period]` / `?filter[period]` key),
+leave usage windows, and the calendars all resolve through it, so this one
+setting shifts every "this month" in the product at once. Payroll periods
+(§63) fall back to it when `payroll_cutoff_day` is null, so a payroll period
+covers exactly the same dates as the rest of the product; a non-null
+`payroll_cutoff_day` still overrides. Leave *year* boundaries
+(`leave_year_start_month`, §144) are unaffected — only the monthly usage
+window an employee sees adopts the reporting month.
 
 Every one of these is read at evaluation time through a settings service. Nothing in this
 list may appear as a literal in application code (§125).
@@ -4101,9 +4119,10 @@ working-days by the method **snapshotted on the period** (§64). `GET|PUT
 (§12).
 
 **Periods (§63/§64).** `payroll_periods` with the §64 status set; `PayrollService::
-createPeriod(year, month)` derives boundaries from `organization_settings.
-payroll_cutoff_day` — null → 1st-to-month-end, `25` → 26th-of-previous to 25th — and
-snapshots the cutoff day and salary-day method. `payroll_settings` singleton (new
+createPeriod(year, month)` derives boundaries through `ReportingPeriodService` from
+`organization_settings.payroll_cutoff_day`, falling back to `reporting_month_cutoff_day`
+(§85) when that is null — null/null → 1st-to-month-end, `25` → 26th-of-previous to 25th —
+and snapshots the effective cutoff day and salary-day method. `payroll_settings` singleton (new
 table, `PayrollSettings::current()` mirroring the OrganizationSettings raw-attributes
 cache) holds the `late_penalty` / `absence` / `unpaid_leave` / `overtime` toggles and
 the §147 `dispute_window_days` (default 7).
