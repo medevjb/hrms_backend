@@ -73,8 +73,23 @@ test('organization settings expose the resolved reporting period', function () {
 
     $this->actingAs($user)->getJson('/api/v1/settings/organization')
         ->assertOk()
-        ->assertJsonPath('data.reporting_month_cutoff_day', null)
+        ->assertJsonPath('data.reporting_month_cutoff_day', 25) // §85 default
         ->assertJsonStructure(['data' => ['reporting_period' => ['key', 'label', 'start_date', 'end_date']]]);
+});
+
+test('the reporting month defaults to a cutoff of 25', function () {
+    $user = userWithSettingsPermission(PermissionName::SettingsManage);
+
+    $this->travelTo('2026-09-10');
+
+    $this->actingAs($user)->getJson('/api/v1/settings/organization')
+        ->assertOk()
+        ->assertJsonPath('data.reporting_month_cutoff_day', 25)
+        ->assertJsonPath('data.reporting_period.start_date', '2026-08-26')
+        ->assertJsonPath('data.reporting_period.end_date', '2026-09-25')
+        ->assertJsonPath('data.reporting_period.label', 'September 2026');
+
+    expect(OrganizationSettings::current()->reporting_month_cutoff_day)->toBe(25);
 });
 
 test('an admin can set the reporting month cutoff day and it shifts the resolved period', function () {
@@ -96,6 +111,8 @@ test('an admin can set the reporting month cutoff day and it shifts the resolved
 });
 
 test('a non-admin cannot change the reporting month cutoff day', function () {
+    OrganizationSettings::current()->update(['reporting_month_cutoff_day' => null]);
+
     $this->actingAs(User::factory()->create())
         ->putJson('/api/v1/settings/organization', ['reporting_month_cutoff_day' => 25])
         ->assertStatus(403);
