@@ -32,7 +32,13 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 beforeEach(function () {
     SalaryComponent::factory()->basic()->create();
     SalaryComponent::factory()->create(['code' => 'HOUSING', 'name' => 'Housing Allowance']);
-    OrganizationSettings::current()->update(['timezone' => 'UTC', 'payroll_cutoff_day' => null]);
+    // These cases assert plain calendar-month boundaries, so clear both the
+    // payroll cutoff and the §85 reporting-month cutoff it falls back to.
+    OrganizationSettings::current()->update([
+        'timezone' => 'UTC',
+        'payroll_cutoff_day' => null,
+        'reporting_month_cutoff_day' => null,
+    ]);
     PayrollSettings::current()->update([
         'late_penalty_enabled' => true,
         'absence_deduction_enabled' => true,
