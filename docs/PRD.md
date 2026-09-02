@@ -2958,12 +2958,14 @@ attendance_min_minutes_half_day   §29 HALF_DAY had no producing rule
 leave_year_start_month            §144 accrual
 leave_carry_forward_cap_days
 
-reporting_month_cutoff_day         §85 — org-wide reporting month; see below
+reporting_month_cutoff_day         §85 — org-wide reporting month, default 25; see below
 ```
 
-**Reporting month (`reporting_month_cutoff_day`).** Admin-only, 1–28 or null.
-Null means every reporting month is the calendar month (the original
-behaviour). Set to `C`, reporting month *M* runs from day `C+1` of *M-1*
+**Reporting month (`reporting_month_cutoff_day`).** Admin-only, 1–28 or null,
+**default 25**. Null means every reporting month is the calendar month; a
+fresh install and any row never given an explicit value resolve to 25, so
+out of the box reporting month *M* runs from the 26th of *M-1* through the
+25th of *M*. Set to `C`, reporting month *M* runs from day `C+1` of *M-1*
 through day `C` of *M*, and is always labelled and keyed (`YYYY-MM`) by the
 month it ends in — cutoff 25 makes the window ending 25 Sep "September". A
 single resolver (`ReportingPeriodService`) is the only place month
