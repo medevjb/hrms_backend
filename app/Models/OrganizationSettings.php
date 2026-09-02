@@ -101,6 +101,7 @@ class OrganizationSettings extends Model
         'missing_checkout_policy' => 'LEAVE_OPEN',
         'attendance_checkin_window_minutes' => 240, // §136 default
         'leave_year_start_month' => 1,
+        'reporting_month_cutoff_day' => 25, // §85 — reporting month runs 26th → 25th by default
     ];
 
     protected function casts(): array
